@@ -88,10 +88,11 @@ services:
 
 plugins:
   # Correlation ID propagation plugin (UUID v4 header generation)
-  - name: request-id
+  - name: correlation-id
     config:
       header_name: X-Correlation-ID
-      include_in_response: true
+      generator: uuid
+      echo_downstream: true
 
   # Global security headers plugin
   - name: response-transformer
