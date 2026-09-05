@@ -23,32 +23,11 @@ export default function CustomerPortalDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-
   useEffect(() => {
-    // If user is not logged in or is not customer, still allow viewing if they have customer email
-    const email = user?.email || 'procurement@acme.com';
-
-    async function fetchCustomerQuotes() {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(`${apiUrl}/portal/quotes/customer/list?email=${encodeURIComponent(email)}`);
-        if (res.ok) {
-          const json = await res.json();
-          setQuotes(json.data || []);
-        } else {
-          throw new Error('Failed to load customer quotations');
-        }
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCustomerQuotes();
-  }, [user, apiUrl]);
+    setQuotes([]);
+    setError('Open a quote-specific magic link to view and manage a quotation.');
+    setLoading(false);
+  }, []);
 
   const getStatusBadge = (status: string) => {
     const s = status.toLowerCase();

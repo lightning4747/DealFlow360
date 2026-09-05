@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Inject } from '@nestjs/common';
 import { PortalService } from './portal.service';
 import { Public } from '../auth/decorators/auth.decorator';
 import { CustomerCounterProposalSchema } from '@dealflow360/types';
@@ -30,34 +30,4 @@ export class PortalController {
     return { data, meta: null, error: null };
   }
 
-  @Public()
-  @Get('customer/list')
-  async listCustomerQuotes(@Query('email') email: string) {
-    const data = await this.portalService.getCustomerQuotesByEmail(email);
-    return { data, meta: { total: data.length }, error: null };
-  }
-
-  @Public()
-  @Get(':id')
-  async getQuoteById(@Param('id') id: string, @Query('email') email?: string) {
-    const data = await this.portalService.getSanitizedQuoteById(id, email);
-    return { data, meta: null, error: null };
-  }
-
-  @Public()
-  @Post(':id/counter')
-  async submitCounterById(@Param('id') id: string, @Body() body: any) {
-    const dto = CustomerCounterProposalSchema.parse(body);
-    const data = await this.portalService.submitCounterProposalById(id, dto);
-    return { data, meta: null, error: null };
-  }
-
-  @Public()
-  @Post(':id/confirm')
-  async confirmQuoteById(@Param('id') id: string, @Body() body: any) {
-    const participantName = body?.participantName;
-    const data = await this.portalService.confirmQuoteById(id, participantName);
-    return { data, meta: null, error: null };
-  }
 }
-

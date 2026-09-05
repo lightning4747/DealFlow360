@@ -29,12 +29,7 @@ export default function CustomerPortalNegotiationPage() {
   useEffect(() => {
     async function loadQuote() {
       try {
-        // Try viewing as token first
-        let res = await fetch(`${apiUrl}/portal/quotes/view?token=${token}`);
-        if (!res.ok) {
-          // If token lookup fails, try viewing directly by quote id
-          res = await fetch(`${apiUrl}/portal/quotes/${token}`);
-        }
+        const res = await fetch(`${apiUrl}/portal/quotes/view?token=${encodeURIComponent(token)}`);
 
         if (res.ok) {
           const json = await res.json();
