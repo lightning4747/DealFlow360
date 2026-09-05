@@ -715,6 +715,10 @@ export class BillingService {
       if (!invoice) {
         throw new NotFoundException(`Invoice ${params.invoiceId} not found`);
       }
+      const invoiceAmount = Number(invoice.totalAmount);
+      if (!Number.isFinite(invoiceAmount) || Number(params.amount.toFixed(2)) !== Number(invoiceAmount.toFixed(2))) {
+        throw new UnprocessableEntityException(`Payment amount does not match invoice ${params.invoiceId}`);
+      }
 
       if (params.referenceTransactionId) {
         const [existingPayment] = await tx

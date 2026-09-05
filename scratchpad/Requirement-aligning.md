@@ -771,9 +771,9 @@ Files:
 
 Actual behavior
 
-Payments now reject duplicate gateway transaction IDs through a database unique index and `recordPayment` returns the original successful payment for repeated transaction callbacks. Already-paid invoices are also treated idempotently when a payment record exists.
+Payments now require an authenticated tenant context, reject duplicate gateway transaction IDs through a database unique index, and `recordPayment` returns the original successful payment for repeated transaction callbacks. Settlement now validates that the payment amount matches the invoice, and already-paid invoices are treated idempotently when a payment record exists. Settlement errors are propagated so a successful gateway result cannot be reported while persistence failed.
 
-Webhook event IDs still have no durable receipt table, and the payment controller still needs request authentication, invoice ownership/amount validation, and explicit reconciliation for failed settlement writes.
+Webhook event IDs still have no durable receipt table, and tenant/customer ownership is not yet modeled strongly enough for complete cross-tenant authorization.
 
 Impact
 
@@ -781,7 +781,7 @@ Retries or duplicate webhook deliveries can create duplicate payments or repeate
 
 Correction
 
-Completed the gateway transaction uniqueness and atomic duplicate-payment checks. Add durable webhook receipt records, authenticate and scope payment requests, validate invoice amount/currency/status before gateway invocation, and surface settlement failures without silently swallowing them.
+Completed gateway transaction uniqueness, duplicate-payment checks, authenticated tenant context, invoice amount validation, and explicit settlement error propagation. Add durable webhook receipt records, stronger invoice ownership/currency checks before gateway invocation, and payment reconciliation.
 
 ────────────────────
 

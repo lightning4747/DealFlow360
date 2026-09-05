@@ -7,6 +7,7 @@ import {
   HttpStatus,
   BadRequestException,
   UseGuards,
+  Req,
   Inject,
   Logger,
 } from '@nestjs/common';
@@ -35,8 +36,12 @@ export class PaymentsController {
   async processPayment(
     @Headers('x-tenant-id') tenantIdHeader: string,
     @Body() rawBody: any,
+    @Req() request: { user?: { tenantId?: string } },
   ) {
-    const tenantId = tenantIdHeader || rawBody.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = request.user?.tenantId || tenantIdHeader;
+    if (!tenantId) {
+      throw new BadRequestException('Authenticated tenant context is required');
+    }
     const parsed = ProcessPaymentRequestSchema.safeParse({ ...rawBody, tenantId });
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.errors);
@@ -46,17 +51,13 @@ export class PaymentsController {
 
     // If payment succeeded immediately, record payment in billing engine
     if (result.status === 'SUCCEEDED') {
-      try {
-        await this.billingService.recordPayment({
-          invoiceId: parsed.data.invoiceId,
-          tenantId,
-          amount: parsed.data.amount,
-          paymentMethod: 'CREDIT_CARD',
-          referenceTransactionId: result.transactionId,
-        });
-      } catch (err: any) {
-        this.logger.error(`Error recording payment for invoice ${parsed.data.invoiceId}: ${err.message}`);
-      }
+      await this.billingService.recordPayment({
+        invoiceId: parsed.data.invoiceId,
+        tenantId,
+        amount: parsed.data.amount,
+        paymentMethod: 'CREDIT_CARD',
+        referenceTransactionId: result.transactionId,
+      });
     }
 
     if (result.status === 'FAILED') {
@@ -93,18 +94,14 @@ export class PaymentsController {
     this.logger.log(`Received verified webhook event [${event.eventType}] for txn ${event.transactionId}`);
 
     if (event.eventType === 'payment_intent.succeeded') {
-      try {
-        await this.billingService.recordPayment({
-          invoiceId: event.invoiceId,
-          tenantId: event.tenantId,
-          amount: event.amount,
-          paymentMethod: 'CREDIT_CARD',
-          referenceTransactionId: event.transactionId,
-        });
-        this.logger.log(`Invoice ${event.invoiceId} successfully settled via 3DS webhook`);
-      } catch (err: any) {
-        this.logger.error(`Error processing webhook settlement for invoice ${event.invoiceId}: ${err.message}`);
-      }
+      await this.billingService.recordPayment({
+        invoiceId: event.invoiceId,
+        tenantId: event.tenantId,
+        amount: event.amount,
+        paymentMethod: 'CREDIT_CARD',
+        referenceTransactionId: event.transactionId,
+      });
+      this.logger.log(`Invoice ${event.invoiceId} successfully settled via 3DS webhook`);
     }
 
     return { received: true, eventId: event.eventId };
