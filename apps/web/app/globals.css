@@ -2,17 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #0f172a;
-  --foreground: #f8fafc;
-  --card: #1e293b;
-  --card-foreground: #f8fafc;
-  --border: #334155;
+@layer base {
+  :root {
+    --background: 220 25% 6%;
+    --foreground: 210 20% 98%;
+    --card: 222 30% 9%;
+    --card-foreground: 210 20% 98%;
+    --popover: 222 30% 9%;
+    --popover-foreground: 210 20% 98%;
+
+    /* DealFlow360 Brand Accent: Ink-Blue */
+    --primary: 224 47% 43%;
+    --primary-foreground: 210 40% 98%;
+    --flow: 224 47% 43%;
+
+    --secondary: 220 20% 14%;
+    --secondary-foreground: 210 20% 98%;
+
+    --muted: 220 18% 16%;
+    --muted-foreground: 215 15% 65%;
+
+    --accent: 220 20% 16%;
+    --accent-foreground: 210 20% 98%;
+
+    /* Status Semantics */
+    --success: 158 39% 40%;
+    --success-foreground: 210 40% 98%;
+    --warning: 39 62% 51%;
+    --warning-foreground: 220 25% 6%;
+    --destructive: 16 65% 47%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 16% 18%;
+    --input: 220 16% 18%;
+    --ring: 224 47% 43%;
+
+    /* Rounded corner radius tokens - avoiding sharp edges */
+    --radius: 0.75rem;
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+  }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  min-height: 100vh;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Glassmorphic Layer Utilities */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.5) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+.glass-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-hover:hover {
+  border-color: rgba(59, 91, 169, 0.35);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.4), 0 0 15px -2px rgba(59, 91, 169, 0.15);
+}
+
+/* Tabular Numerics for Finance & Ledgers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
