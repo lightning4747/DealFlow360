@@ -8,7 +8,7 @@ import * as jwt from 'jsonwebtoken';
 export class JwtAuthGuard implements CanActivate {
   private readonly jwtSecret = process.env.JWT_SECRET || 'super_secret_jwt_key_dealflow360_change_in_production';
 
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector = new Reflector()) {}
 
   canActivate(context: ExecutionContext): boolean {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
