@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Inject } from '@nestjs/common';
 import { PortalService } from './portal.service';
 import { Public } from '../auth/decorators/auth.decorator';
 import { CustomerCounterProposalSchema } from '@dealflow360/types';
 
 @Controller('api/v1/portal/quotes')
 export class PortalController {
-  constructor(private readonly portalService: PortalService) {}
+  constructor(@Inject(PortalService) private readonly portalService: PortalService) {}
 
   @Public()
   @Get('view')

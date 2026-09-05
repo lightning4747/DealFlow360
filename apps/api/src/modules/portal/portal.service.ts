@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DRIZZLE_DB } from '../database/database.module';
-import { magicLinks, quotes, quoteLines, products, lineComments, negotiationSessions } from '@dealflow360/database';
+import { magicLinks, quotes, quoteLines, products, lineComments, negotiationSessions, customers } from '@dealflow360/database';
 import { eq, and, gt, desc } from 'drizzle-orm';
 import { CustomerCounterProposalDto } from '@dealflow360/types';
 import { ApprovalRoutingService } from '../governance/approval-routing.service';
@@ -11,8 +11,8 @@ import * as crypto from 'crypto';
 export class PortalService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: any,
-    private readonly approvalRoutingService: ApprovalRoutingService,
-    private readonly orderBifurcationService: OrderBifurcationService,
+    @Inject(ApprovalRoutingService) private readonly approvalRoutingService: ApprovalRoutingService,
+    @Inject(OrderBifurcationService) private readonly orderBifurcationService: OrderBifurcationService,
   ) {}
 
   async getSanitizedQuoteByToken(token: string) {
