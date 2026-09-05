@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus, Res, Inject, Logger } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res, Inject, Logger, Optional } from '@nestjs/common';
 import { Response } from 'express';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
@@ -15,10 +15,10 @@ export class HealthController {
   constructor(
     @Inject(DRIZZLE_DB)
     private readonly db: NodePgDatabase<typeof schema>,
-    private readonly configService: ConfigService,
+    @Optional() private readonly configService?: ConfigService,
   ) {
-    const host = this.configService.get<string>('REDIS_HOST') || 'localhost';
-    const port = parseInt(this.configService.get<string>('REDIS_PORT') || '6379', 10);
+    const host = this.configService?.get<string>('REDIS_HOST') || process.env.REDIS_HOST || 'localhost';
+    const port = parseInt(this.configService?.get<string>('REDIS_PORT') || process.env.REDIS_PORT || '6379', 10);
     this.redisClient = new Redis({
       host,
       port,
@@ -76,12 +76,10 @@ export class HealthController {
         latencyMs: Date.now() - redisStart,
       };
     } catch (err: any) {
-      // In local/dev graceful mode, log warning
       checks.redis = {
         status: 'down',
         error: err.message,
       };
-      // For readiness, mark degraded if redis is down
       isHealthy = false;
     }
 

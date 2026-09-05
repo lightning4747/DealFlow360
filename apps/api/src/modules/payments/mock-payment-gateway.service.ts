@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { IPaymentGatewayProvider } from './payment-gateway.interface';
@@ -13,8 +13,8 @@ export class MockPaymentGatewayService implements IPaymentGatewayProvider {
   private readonly logger = new Logger(MockPaymentGatewayService.name);
   private readonly webhookSecret: string;
 
-  constructor(private readonly configService: ConfigService) {
-    this.webhookSecret = this.configService.get<string>('PAYMENT_WEBHOOK_SECRET') || 'whsec_test_mock_secret_key_360';
+  constructor(@Optional() private readonly configService?: ConfigService) {
+    this.webhookSecret = this.configService?.get<string>('PAYMENT_WEBHOOK_SECRET') || process.env.PAYMENT_WEBHOOK_SECRET || 'whsec_test_mock_secret_key_360';
   }
 
   async processPayment(request: ProcessPaymentRequestDto): Promise<ProcessPaymentResponseDto> {
