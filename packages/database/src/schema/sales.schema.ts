@@ -126,6 +126,8 @@ export const customers = salesSchema.table(
     tierId: uuid('tier_id').references(() => customerTiers.id, { onDelete: 'set null' }),
     creditLimit: numeric('credit_limit', { precision: 12, scale: 2 }).notNull().default('100000.00'),
     location: text('location'),
+    deliveryLatitude: numeric('delivery_latitude', { precision: 10, scale: 6 }),
+    deliveryLongitude: numeric('delivery_longitude', { precision: 10, scale: 6 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
   },
   (table) => ({
