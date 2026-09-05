@@ -4,4 +4,6 @@ export * from './dto/master-data.dto';
 export * from './dto/deal-studio.dto';
 export * from './dto/fulfillment.dto';
 export * from './dto/billing.dto';
+export * from './dto/analytics.dto';
+export * from './dto/payment-gateway.dto';
 export * from './events/kafka-envelope.event';
