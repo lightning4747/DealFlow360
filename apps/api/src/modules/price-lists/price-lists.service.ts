@@ -1,52 +1,59 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePriceListDto, BulkPriceListItemsDto } from '@dealflow360/types';
+import { db, priceLists, priceListItems, PriceList, products } from '@dealflow360/database';
+import { eq } from 'drizzle-orm';
 
 @Injectable()
 export class PriceListsService {
-  private priceLists: Map<string, any> = new Map();
-  private priceListItems: Map<string, Map<string, number>> = new Map();
-
   async create(dto: CreatePriceListDto) {
-    const id = `plist_${Date.now()}`;
-    const priceList = {
-      id,
-      ...dto,
-      createdAt: new Date().toISOString(),
-    };
-    this.priceLists.set(id, priceList);
-    this.priceListItems.set(id, new Map());
-    return priceList;
+    const [record] = await db
+      .insert(priceLists)
+      .values({
+        name: dto.name,
+        tierId: dto.tierId ?? null,
+        effectiveDate: dto.effectiveDate ? new Date(dto.effectiveDate) : new Date(),
+      })
+      .returning();
+
+    return this.mapPriceList(record);
+  }
+
+  async findAll() {
+    const lists = await db.select().from(priceLists);
+    return lists.map((pl) => this.mapPriceList(pl));
   }
 
   async addItems(priceListId: string, dto: BulkPriceListItemsDto) {
-    const priceList = this.priceLists.get(priceListId);
-    if (!priceList) {
-      throw new NotFoundException({
-        code: 'PRICE_LIST_NOT_FOUND',
-        message: `Price list with id ${priceListId} was not found`,
-        statusCode: 404,
-      });
+    await this.findOne(priceListId);
+
+    for (const item of dto.items) {
+      await db
+        .insert(priceListItems)
+        .values({
+          priceListId,
+          productId: item.productId,
+          price: item.price.toString(),
+        })
+        .onConflictDoUpdate({
+          target: [priceListItems.priceListId, priceListItems.productId],
+          set: { price: item.price.toString() },
+        });
     }
 
-    let itemsMap = this.priceListItems.get(priceListId);
-    if (!itemsMap) {
-      itemsMap = new Map();
-      this.priceListItems.set(priceListId, itemsMap);
-    }
-
-    dto.items.forEach((item) => {
-      itemsMap!.set(item.productId, item.price);
-    });
+    const items = await db
+      .select()
+      .from(priceListItems)
+      .where(eq(priceListItems.priceListId, priceListId));
 
     return {
       priceListId,
       updatedCount: dto.items.length,
-      totalItems: itemsMap.size,
+      totalItems: items.length,
     };
   }
 
   async findOne(id: string) {
-    const priceList = this.priceLists.get(id);
+    const [priceList] = await db.select().from(priceLists).where(eq(priceLists.id, id)).limit(1);
     if (!priceList) {
       throw new NotFoundException({
         code: 'PRICE_LIST_NOT_FOUND',
@@ -55,15 +62,37 @@ export class PriceListsService {
       });
     }
 
-    const itemsMap = this.priceListItems.get(id) || new Map();
-    const items = Array.from(itemsMap.entries()).map(([productId, price]) => ({
-      productId,
-      price,
-    }));
+    const items = await db
+      .select({
+        id: priceListItems.id,
+        productId: priceListItems.productId,
+        price: priceListItems.price,
+        productName: products.name,
+        productSku: products.sku,
+      })
+      .from(priceListItems)
+      .leftJoin(products, eq(priceListItems.productId, products.id))
+      .where(eq(priceListItems.priceListId, id));
 
     return {
-      ...priceList,
-      items,
+      ...this.mapPriceList(priceList),
+      items: items.map((it) => ({
+        id: it.id,
+        productId: it.productId,
+        productName: it.productName,
+        productSku: it.productSku,
+        price: parseFloat(it.price),
+      })),
+    };
+  }
+
+  private mapPriceList(record: PriceList) {
+    return {
+      id: record.id,
+      name: record.name,
+      tierId: record.tierId,
+      effectiveDate: record.effectiveDate,
+      createdAt: record.createdAt,
     };
   }
 }

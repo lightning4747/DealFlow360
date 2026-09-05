@@ -18,6 +18,13 @@ export class PriceListsController {
     return { data, meta: null, error: null };
   }
 
+  @Get()
+  @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
+  async findAll() {
+    const data = await this.priceListsService.findAll();
+    return { data, meta: null, error: null };
+  }
+
   @Post(':id/items')
   @Roles('admin', 'finance')
   async addItems(@Param('id') id: string, @Body() body: any) {
