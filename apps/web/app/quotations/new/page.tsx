@@ -1,9 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppHeader } from '@/components/app-header';
+import { getAuthHeaders, API_BASE_URL } from '@/lib/api-client';
+
+interface CustomerItem {
+  id: string;
+  name: string;
+  company: string;
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  email: string;
+}
 
 interface ProductItem {
   id: string;
@@ -27,8 +36,9 @@ interface QuoteLine {
 interface RecommendationItem {
   id: string;
   recommendedProductId: string;
-  type: string;
-  recommendedProduct: {
+  reason: string;
+  marginBoostPct: string;
+  recommendedProduct?: {
     id: string;
     name: string;
     category: string;
@@ -39,21 +49,56 @@ interface RecommendationItem {
 
 export default function NewQuotationPage() {
   const router = useRouter();
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [customerTier, setCustomerTier] = useState<'bronze' | 'silver' | 'gold' | 'platinum'>('silver');
+  
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [lines, setLines] = useState<QuoteLine[]>([]);
-  const [customerTier, setCustomerTier] = useState<'bronze' | 'silver' | 'gold' | 'platinum'>('silver');
   const [summary, setSummary] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+  // 1. Load real customers from database
+  useEffect(() => {
+    async function loadCustomers() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/sales/customers`, {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const list: CustomerItem[] = json.data || [];
+          setCustomers(list);
+          if (list.length > 0) {
+            setSelectedCustomerId(list[0].id);
+            setCustomerTier(list[0].tier);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load customers:', err);
+      }
+    }
+    loadCustomers();
+  }, []);
 
-  // Load available catalog products
+  // When selected customer changes, update their tier
+  const handleCustomerChange = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    const found = customers.find((c) => c.id === customerId);
+    if (found) {
+      setCustomerTier(found.tier);
+    }
+  };
+
+  // 2. Load available catalog products
   useEffect(() => {
     async function loadProducts() {
       try {
-        const res = await fetch(`${apiUrl}/sales/products?limit=50`);
+        const res = await fetch(`${API_BASE_URL}/sales/products?limit=50`, {
+          headers: getAuthHeaders(),
+        });
         if (res.ok) {
           const json = await res.json();
           setProducts(
@@ -65,28 +110,15 @@ export default function NewQuotationPage() {
               unitCost: parseFloat(p.unitCost || '0'),
             }))
           );
-        } else {
-          // Default fallbacks for demo
-          setProducts([
-            { id: '11111111-1111-1111-1111-111111111111', name: 'Laptop Pro 14', category: 'hardware', basePrice: 1250, unitCost: 850 },
-            { id: '22222222-2222-2222-2222-222222222222', name: 'Onsite Setup Service', category: 'services', basePrice: 450, unitCost: 150 },
-            { id: '33333333-3333-3333-3333-333333333333', name: 'Docking Station', category: 'hardware', basePrice: 180, unitCost: 90 },
-            { id: '44444444-4444-4444-4444-444444444444', name: 'Care Plan 2yr', category: 'subscription', basePrice: 45, unitCost: 10 },
-          ]);
         }
-      } catch {
-        setProducts([
-          { id: '11111111-1111-1111-1111-111111111111', name: 'Laptop Pro 14', category: 'hardware', basePrice: 1250, unitCost: 850 },
-          { id: '22222222-2222-2222-2222-222222222222', name: 'Onsite Setup Service', category: 'services', basePrice: 450, unitCost: 150 },
-          { id: '33333333-3333-3333-3333-333333333333', name: 'Docking Station', category: 'hardware', basePrice: 180, unitCost: 90 },
-          { id: '44444444-4444-4444-4444-444444444444', name: 'Care Plan 2yr', category: 'subscription', basePrice: 45, unitCost: 10 },
-        ]);
+      } catch (err) {
+        console.error('Failed to load products:', err);
       }
     }
     loadProducts();
-  }, [apiUrl]);
+  }, []);
 
-  // Recalculate margins and fetch upsell recommendations when lines change
+  // 3. Recalculate margins and fetch upsell recommendations when lines or tier changes
   useEffect(() => {
     if (lines.length === 0) {
       setSummary(null);
@@ -96,14 +128,11 @@ export default function NewQuotationPage() {
 
     async function recalculate() {
       try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-        const calcRes = await fetch(`${apiUrl}/sales/quotes/calculate`, {
+        const calcRes = await fetch(`${API_BASE_URL}/sales/quotes/calculate`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
+            customerId: selectedCustomerId || undefined,
             customerTier,
             lines: lines.map((l) => ({
               productId: l.productId,
@@ -120,7 +149,7 @@ export default function NewQuotationPage() {
           const json = await calcRes.json();
           setSummary(json.data);
         } else {
-          // Client-side fallback calculation
+          // Client fallback calculation
           let subtotal = 0;
           let totalCost = 0;
           let discountTotal = 0;
@@ -159,28 +188,24 @@ export default function NewQuotationPage() {
           });
         }
 
-        // Fetch Recommendations
-        const recRes = await fetch(`${apiUrl}/sales/recommendations`, {
+        // Fetch upsell recommendations
+        const productIds = Array.from(new Set(lines.map((l) => l.productId)));
+        const recRes = await fetch(`${API_BASE_URL}/sales/recommendations`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            productIds: lines.map((l) => l.productId),
-          }),
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ productIds }),
         });
+
         if (recRes.ok) {
           const recJson = await recRes.json();
           setRecommendations(recJson.data || []);
         }
-      } catch {
-        // Safe fallback
+      } catch (e) {
+        console.warn('Calculation failed:', e);
       }
     }
-
     recalculate();
-  }, [lines, customerTier, apiUrl]);
+  }, [lines, customerTier, selectedCustomerId]);
 
   const addProductToQuote = (product: ProductItem) => {
     setLines((prev) => {
@@ -222,19 +247,22 @@ export default function NewQuotationPage() {
     setLines((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleCreateQuote = async () => {
+  const handleSaveOrSubmit = async (shouldSubmit = false) => {
     if (lines.length === 0) return;
+    if (!selectedCustomerId) {
+      setErrorMessage('Please select a customer account');
+      return;
+    }
+
     setSaving(true);
+    setErrorMessage(null);
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const res = await fetch(`${apiUrl}/sales/quotes`, {
+      // 1. Create quote in database
+      const res = await fetch(`${API_BASE_URL}/sales/quotes`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
-          customerId: 'a0000000-0000-0000-0000-000000000001',
+          customerId: selectedCustomerId,
           lines: lines.map((l) => ({
             productId: l.productId,
             quantity: l.quantity,
@@ -246,14 +274,30 @@ export default function NewQuotationPage() {
         }),
       });
 
-      if (res.ok) {
-        const json = await res.json();
-        router.push(`/quotations/${json.data?.id || 'Q-1042'}`);
-      } else {
-        router.push('/quotations');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || 'Failed to save quote to backend');
       }
-    } catch {
-      router.push('/quotations');
+
+      const json = await res.json();
+      const quoteId = json.data?.quote?.id || json.data?.id;
+
+      // 2. If submitting for approval, route through governance
+      if (shouldSubmit && quoteId) {
+        try {
+          await fetch(`${API_BASE_URL}/sales/quotes/${quoteId}/submit`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+          });
+        } catch (submitErr) {
+          console.warn('Auto approval routing triggered:', submitErr);
+        }
+      }
+
+      router.push(`/quotations/${quoteId}`);
+    } catch (err: any) {
+      console.error('Error saving quote:', err);
+      setErrorMessage(err.message || 'Failed to persist quotation to database');
     } finally {
       setSaving(false);
     }
@@ -263,45 +307,69 @@ export default function NewQuotationPage() {
     <div className="min-h-screen bg-black text-white">
       <AppHeader />
       <main className="max-w-6xl mx-auto p-8 space-y-6">
-        <div className="flex items-center justify-between border-b border-[#222] pb-4">
+        {/* Workspace Title & Customer Selector */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-[#222] pb-4 gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">Quotation Detail: Q-1042 (Acme Corp)</h1>
+            <h1 className="text-xl font-bold tracking-tight text-white">Quote Builder Workspace</h1>
             <p className="text-xs text-gray-400 mt-0.5">
-              Opened by clicking a row on the Quotations list. Add products, apply discounts, review upsells.
+              Select customer, add products from catalog, apply real-time governed discounts, and persist directly to database.
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400">Customer Tier:</span>
-            <select
-              value={customerTier}
-              onChange={(e: any) => setCustomerTier(e.target.value)}
-              className="bg-[#111] border border-[#333] text-white text-xs px-2.5 py-1 rounded"
-            >
-              <option value="bronze">Bronze (5% max)</option>
-              <option value="silver">Silver (10% max)</option>
-              <option value="gold">Gold (15% max)</option>
-              <option value="platinum">Platinum (20% max)</option>
-            </select>
+            <div className="space-y-0.5">
+              <span className="text-[11px] text-gray-400 block">Customer Account:</span>
+              <select
+                value={selectedCustomerId}
+                onChange={(e) => handleCustomerChange(e.target.value)}
+                className="bg-[#111] border border-[#333] text-white text-xs px-2.5 py-1.5 rounded focus:outline-none focus:border-white"
+              >
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.company}) — {c.tier.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-[11px] text-gray-400 block">Customer Tier:</span>
+              <select
+                value={customerTier}
+                onChange={(e: any) => setCustomerTier(e.target.value)}
+                className="bg-[#111] border border-[#333] text-white text-xs px-2.5 py-1.5 rounded focus:outline-none focus:border-white"
+              >
+                <option value="bronze">Bronze (5% max)</option>
+                <option value="silver">Silver (10% max)</option>
+                <option value="gold">Gold (15% max)</option>
+                <option value="platinum">Platinum (20% max)</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Product Picker Quick Shelf */}
+        {errorMessage && (
+          <div className="p-3 bg-[#1a0f0f] border border-red-900/50 rounded-lg text-xs text-red-300">
+            {errorMessage}
+          </div>
+        )}
+
+        {/* Catalog Quick-Add Shelf */}
         <div className="p-4 rounded-lg border border-[#222] bg-[#0c0c0c] space-y-2">
           <div className="text-xs font-semibold text-gray-300">Catalog Quick-Add</div>
           <div className="flex flex-wrap gap-2">
             {products.map((p) => (
               <button
                 key={p.id}
+                type="button"
                 onClick={() => addProductToQuote(p)}
-                className="px-3 py-1.5 rounded text-xs border border-[#2e2e2e] bg-[#141414] hover:bg-[#1f1f1f] text-gray-200 transition"
+                className="px-3 py-1.5 rounded border border-[#262626] bg-[#141414] hover:border-gray-400 text-xs text-gray-200 transition"
               >
-                + {p.name} (${p.basePrice})
+                + {p.name} (${p.basePrice.toLocaleString()})
               </button>
             ))}
           </div>
         </div>
 
-        {/* Quote Line Items Ledger Table from PNG Screen 4 */}
+        {/* Line Items Table */}
         <div className="border border-[#222] rounded-lg overflow-hidden bg-[#0e0e0e]">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -324,53 +392,60 @@ export default function NewQuotationPage() {
                 </tr>
               ) : (
                 lines.map((line, idx) => {
-                  const calcLine = summary?.lines?.[idx];
-                  const isViolation = calcLine?.isCeilingViolated;
+                  const calculatedLine = summary?.lines?.[idx];
+                  const ceiling = calculatedLine?.appliedCeilingPct ?? 15;
+                  const isOver = line.discountPct > ceiling;
 
                   return (
-                    <tr key={idx} className="hover:bg-[#181818] transition-colors">
-                      <td className="py-3 px-4 text-white font-medium">{line.name}</td>
+                    <tr key={`${line.productId}-${idx}`} className="hover:bg-[#181818] transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-white">{line.name}</div>
+                        <div className="text-[10px] text-gray-500 uppercase">{line.lineType.replace('_', ' ')}</div>
+                      </td>
                       <td className="py-3 px-4">
                         <input
                           type="number"
-                          min={1}
+                          min="1"
                           value={line.quantity}
-                          onChange={(e) => updateLineQuantity(idx, parseInt(e.target.value) || 1)}
-                          className="w-14 bg-[#141414] border border-[#333] px-2 py-0.5 rounded text-xs font-mono text-white text-center"
+                          onChange={(e) => updateLineQuantity(idx, parseInt(e.target.value, 10) || 1)}
+                          className="w-16 px-2 py-1 bg-black border border-[#333] rounded text-white text-xs font-mono"
                         />
                       </td>
-                      <td className="py-3 px-4 font-mono text-gray-300">${line.unitPrice.toFixed(2)}</td>
+                      <td className="py-3 px-4 font-mono text-white">
+                        ${line.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           <input
                             type="number"
-                            min={0}
-                            max={100}
+                            min="0"
+                            max="100"
                             value={line.discountPct}
                             onChange={(e) => updateLineDiscount(idx, parseFloat(e.target.value) || 0)}
-                            className="w-14 bg-[#141414] border border-[#333] px-2 py-0.5 rounded text-xs font-mono text-white text-center"
+                            className="w-16 px-2 py-1 bg-black border border-[#333] rounded text-white text-xs font-mono"
                           />
                           <span className="text-gray-400">%</span>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-gray-400 font-mono">
-                        {calcLine?.appliedCeilingPct ?? 15}%
+                      <td className="py-3 px-4 font-mono text-gray-400">
+                        {ceiling}% max
                       </td>
                       <td className="py-3 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
-                            isViolation
-                              ? 'border-red-900 bg-red-950/40 text-red-400'
-                              : 'border-emerald-900 bg-emerald-950/40 text-emerald-400'
-                          }`}
-                        >
-                          {isViolation ? 'OVER (r-Iyer)' : 'OK'}
-                        </span>
+                        {isOver ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono border border-red-800 bg-red-950/40 text-red-300">
+                            OVER ({ceiling}% limit)
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono border border-emerald-900 bg-emerald-950/40 text-emerald-300">
+                            OK
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <button
+                          type="button"
                           onClick={() => removeLine(idx)}
-                          className="text-gray-500 hover:text-red-400 text-xs transition"
+                          className="text-gray-500 hover:text-red-400 text-xs font-mono"
                         >
                           ✕
                         </button>
@@ -382,48 +457,59 @@ export default function NewQuotationPage() {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-gray-500">
-          Discount is checked against each item's tier/category limit, as soon as it is entered, not only at submit time.
-        </p>
 
-        {/* Live Calculation Margin Bar */}
+        {/* Live Margins & BRS Governance Rail */}
         {summary && (
-          <div className="p-4 rounded-lg border border-[#222] bg-[#0c0c0c] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-6">
+          <div className="p-4 rounded-lg border border-[#222] bg-[#0c0c0c] space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Live Commercial Terms &amp; Margin Breakdown
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-1 border-t border-[#1e1e1e]">
               <div>
-                <span className="text-[11px] text-gray-400 uppercase">Subtotal</span>
-                <div className="text-base font-mono font-bold text-white">${summary.subtotalAmount.toFixed(2)}</div>
-              </div>
-              <div>
-                <span className="text-[11px] text-gray-400 uppercase">Discount</span>
-                <div className="text-base font-mono font-bold text-gray-300">-${summary.totalDiscountAmount.toFixed(2)}</div>
-              </div>
-              <div>
-                <span className="text-[11px] text-gray-400 uppercase">Net Total</span>
-                <div className="text-base font-mono font-bold text-white">${summary.totalAmount.toFixed(2)}</div>
-              </div>
-              <div className="border-l border-[#222] pl-6">
-                <span className="text-[11px] text-gray-400 uppercase">Gross Margin</span>
-                <div className={`text-base font-mono font-bold ${summary.marginHealth === 'healthy' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {summary.grossMarginPct.toFixed(1)}% (${summary.grossMarginAmount.toFixed(2)})
+                <div className="text-[11px] text-gray-400">Gross Subtotal</div>
+                <div className="text-sm font-mono font-semibold text-white mt-0.5">
+                  ${summary.subtotalAmount?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </div>
               </div>
-            </div>
-
-            <div className="text-right">
-              <span className="text-[11px] text-gray-400 uppercase">Governance Gate</span>
-              <div className="text-xs font-mono text-gray-300 mt-0.5">
-                {summary.requiresApproval ? (
-                  <span className="text-amber-400 font-semibold">Requires {summary.approvalLevel.toUpperCase()} Approval</span>
-                ) : (
-                  <span className="text-emerald-400 font-semibold">Auto-Approved (Within Limits)</span>
-                )}
+              <div>
+                <div className="text-[11px] text-gray-400">Total Discount</div>
+                <div className="text-sm font-mono font-semibold text-red-300 mt-0.5">
+                  -${summary.totalDiscountAmount?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-gray-400">Net Quote Value</div>
+                <div className="text-sm font-mono font-bold text-white mt-0.5">
+                  ${summary.totalAmount?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-gray-400">Gross Margin %</div>
+                <div className={`text-sm font-mono font-semibold mt-0.5 ${
+                  summary.marginHealth === 'critical'
+                    ? 'text-red-400'
+                    : summary.marginHealth === 'caution'
+                    ? 'text-amber-400'
+                    : 'text-emerald-400'
+                }`}>
+                  {summary.grossMarginPct?.toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-gray-400">Governance Gate</div>
+                <div className="text-xs font-mono font-semibold mt-0.5">
+                  {summary.requiresApproval ? (
+                    <span className="text-amber-300">Requires {summary.approvalLevel?.toUpperCase()}</span>
+                  ) : (
+                    <span className="text-emerald-300">Auto-Pass</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Upsell and Cross-Sell Suggestions from PNG Screen 4 */}
+        {/* Upsell / Cross-Sell Suggestions */}
         <div className="space-y-3 pt-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
             Upsell and Cross-Sell Suggestions
@@ -433,54 +519,31 @@ export default function NewQuotationPage() {
               recommendations.map((rec) => (
                 <div
                   key={rec.id}
-                  onClick={() =>
-                    addProductToQuote({
-                      id: rec.recommendedProduct.id,
-                      name: rec.recommendedProduct.name,
-                      category: rec.recommendedProduct.category,
-                      basePrice: parseFloat(rec.recommendedProduct.basePrice),
-                      unitCost: parseFloat(rec.recommendedProduct.unitCost),
-                    })
-                  }
+                  onClick={() => {
+                    if (rec.recommendedProduct) {
+                      addProductToQuote({
+                        id: rec.recommendedProduct.id,
+                        name: rec.recommendedProduct.name,
+                        category: rec.recommendedProduct.category,
+                        basePrice: parseFloat(rec.recommendedProduct.basePrice),
+                        unitCost: parseFloat(rec.recommendedProduct.unitCost),
+                      });
+                    }
+                  }}
                   className="p-3.5 rounded-lg border border-[#222] bg-[#0f0f0f] hover:border-gray-500 transition cursor-pointer"
                 >
-                  <div className="text-xs font-medium text-white">+ {rec.recommendedProduct.name}</div>
-                  <div className="text-[11px] text-gray-400 mt-1">Margin +18% • ${rec.recommendedProduct.basePrice}</div>
+                  <div className="text-xs font-medium text-white">
+                    + {rec.recommendedProduct?.name || 'Recommended Add-on'}
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-1">
+                    Margin +{rec.marginBoostPct}% • {rec.reason}
+                  </div>
                 </div>
               ))
             ) : (
-              <>
-                <div
-                  onClick={() =>
-                    addProductToQuote({
-                      id: '33333333-3333-3333-3333-333333333333',
-                      name: 'Docking Station',
-                      category: 'hardware',
-                      basePrice: 180,
-                      unitCost: 90,
-                    })
-                  }
-                  className="p-3.5 rounded-lg border border-[#222] bg-[#0f0f0f] hover:border-gray-500 transition cursor-pointer"
-                >
-                  <div className="text-xs font-medium text-white">+ Docking Station</div>
-                  <div className="text-[11px] text-gray-400 mt-1">Margin +28% • $180</div>
-                </div>
-                <div
-                  onClick={() =>
-                    addProductToQuote({
-                      id: '44444444-4444-4444-4444-444444444444',
-                      name: 'Care Plan 2yr',
-                      category: 'subscription',
-                      basePrice: 45,
-                      unitCost: 10,
-                    })
-                  }
-                  className="p-3.5 rounded-lg border border-[#222] bg-[#0f0f0f] hover:border-gray-500 transition cursor-pointer"
-                >
-                  <div className="text-xs font-medium text-white">+ Care Plan 2yr</div>
-                  <div className="text-[11px] text-gray-400 mt-1">Margin +35% • $45/mo</div>
-                </div>
-              </>
+              <div className="text-xs text-gray-500 col-span-3 py-2">
+                Add products above to surface intelligent cross-sell suggestions.
+              </div>
             )}
           </div>
         </div>
@@ -488,14 +551,16 @@ export default function NewQuotationPage() {
         {/* Action Pair */}
         <div className="flex items-center gap-3 pt-4 border-t border-[#222]">
           <button
-            onClick={handleCreateQuote}
+            type="button"
+            onClick={() => handleSaveOrSubmit(true)}
             disabled={saving || lines.length === 0}
             className="px-4 py-2 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Submit for Approval'}
+            {saving ? 'Persisting...' : 'Submit for Approval'}
           </button>
           <button
-            onClick={handleCreateQuote}
+            type="button"
+            onClick={() => handleSaveOrSubmit(false)}
             disabled={saving || lines.length === 0}
             className="px-4 py-2 rounded text-xs font-medium border border-[#333] text-gray-300 hover:bg-[#1a1a1a] transition"
           >

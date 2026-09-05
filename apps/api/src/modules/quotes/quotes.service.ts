@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DRIZZLE_DB } from '../database/database.module';
-import { quotes, quoteLines, lineComments, products, customers } from '@dealflow360/database';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { quotes, quoteLines, lineComments, products, customers, users } from '@dealflow360/database';
+import { eq, desc, inArray, or } from 'drizzle-orm';
 import {
   CreateQuoteDto,
   CalculateQuoteDto,
@@ -24,7 +24,50 @@ export class QuotesService {
     return this.calcService.calculate(dto);
   }
 
-  async createQuote(dto: CreateQuoteDto, user: { id: string; role: string; name: string }) {
+  async findAllQuotes() {
+    const list = await this.db
+      .select({
+        id: quotes.id,
+        quoteNumber: quotes.quoteNumber,
+        status: quotes.status,
+        totalAmount: quotes.totalAmount,
+        costTotal: quotes.costTotal,
+        grossMarginPct: quotes.grossMarginPct,
+        brsScore: quotes.brsScore,
+        createdAt: quotes.createdAt,
+        customerId: quotes.customerId,
+        customerName: customers.name,
+        customerCompany: customers.company,
+        customerTier: customers.tier,
+        repId: quotes.repId,
+        repName: users.name,
+      })
+      .from(quotes)
+      .leftJoin(customers, eq(quotes.customerId, customers.id))
+      .leftJoin(users, eq(quotes.repId, users.id))
+      .orderBy(desc(quotes.createdAt));
+
+    return list;
+  }
+
+  async findAllCustomers() {
+    const list = await this.db
+      .select({
+        id: customers.id,
+        name: customers.name,
+        company: customers.company,
+        email: customers.email,
+        tier: customers.tier,
+        creditLimit: customers.creditLimit,
+        location: customers.location,
+      })
+      .from(customers)
+      .orderBy(customers.name);
+
+    return list;
+  }
+
+  async createQuote(dto: CreateQuoteDto, user: any) {
     // 1. Fetch customer to identify tier
     const [customer] = await this.db.select().from(customers).where(eq(customers.id, dto.customerId));
     if (!customer) {
@@ -38,14 +81,15 @@ export class QuotesService {
       lines: dto.lines,
     });
 
-    const quoteNumber = `Q-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+    const quoteNumber = `Q-${Date.now().toString().slice(-4)}`;
+    const repId = user?.id || user?.sub;
 
     // 3. Insert Quote
     const [newQuote] = await this.db
       .insert(quotes)
       .values({
         quoteNumber,
-        repId: user.id,
+        repId,
         customerId: dto.customerId,
         status: 'draft',
         totalAmount: calcSummary.totalAmount.toFixed(2),
@@ -83,11 +127,57 @@ export class QuotesService {
   }
 
   async getQuoteById(quoteId: string) {
-    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, quoteId));
+    const [quote] = await this.db
+      .select({
+        id: quotes.id,
+        quoteNumber: quotes.quoteNumber,
+        repId: quotes.repId,
+        customerId: quotes.customerId,
+        status: quotes.status,
+        blendedRiskScore: quotes.blendedRiskScore,
+        brsScore: quotes.brsScore,
+        currentApprovalStep: quotes.currentApprovalStep,
+        totalAmount: quotes.totalAmount,
+        costTotal: quotes.costTotal,
+        grossMarginPct: quotes.grossMarginPct,
+        counterDiscountPct: quotes.counterDiscountPct,
+        expiresAt: quotes.expiresAt,
+        createdAt: quotes.createdAt,
+        updatedAt: quotes.updatedAt,
+        customerName: customers.name,
+        customerCompany: customers.company,
+        customerTier: customers.tier,
+        repName: users.name,
+      })
+      .from(quotes)
+      .leftJoin(customers, eq(quotes.customerId, customers.id))
+      .leftJoin(users, eq(quotes.repId, users.id))
+      .where(or(eq(quotes.id, quoteId), eq(quotes.quoteNumber, quoteId)));
+
     if (!quote) {
       throw new NotFoundException(`Quote ${quoteId} not found`);
     }
-    const lines = await this.db.select().from(quoteLines).where(eq(quoteLines.quoteId, quoteId));
+
+    const lines = await this.db
+      .select({
+        id: quoteLines.id,
+        quoteId: quoteLines.quoteId,
+        productId: quoteLines.productId,
+        productName: products.name,
+        category: products.category,
+        quantity: quoteLines.quantity,
+        unitPrice: quoteLines.unitPrice,
+        unitCost: quoteLines.unitCost,
+        discountPct: quoteLines.discountPct,
+        appliedCeilingPct: quoteLines.appliedCeilingPct,
+        violationScore: quoteLines.violationScore,
+        lineTotal: quoteLines.lineTotal,
+        grossMargin: quoteLines.grossMargin,
+        lineType: quoteLines.lineType,
+      })
+      .from(quoteLines)
+      .leftJoin(products, eq(quoteLines.productId, products.id))
+      .where(eq(quoteLines.quoteId, quote.id));
     
     // Fetch comments for lines
     const lineIds = lines.map((l: any) => l.id);

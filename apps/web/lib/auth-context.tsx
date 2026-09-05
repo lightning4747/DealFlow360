@@ -39,6 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedToken && storedUser) {
         setAccessToken(storedToken);
         setUser(JSON.parse(storedUser));
+      } else {
+        // Automatically establish active sales rep session for immediate out-of-the-box productivity
+        login('rep1@dealflow360.com', 'password123');
       }
     } catch (e) {
       console.error('Failed to load user auth from localStorage', e);

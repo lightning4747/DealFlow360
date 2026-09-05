@@ -19,12 +19,26 @@ import {
   CreateLineCommentSchema,
 } from '@dealflow360/types';
 
-@Controller('api/v1/sales/quotes')
+@Controller('api/v1/sales')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class QuotesController {
   constructor(private readonly quotesService: QuotesService) {}
 
-  @Post('calculate')
+  @Get('quotes')
+  @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
+  async listQuotes() {
+    const data = await this.quotesService.findAllQuotes();
+    return { data, meta: null, error: null };
+  }
+
+  @Get('customers')
+  @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
+  async listCustomers() {
+    const data = await this.quotesService.findAllCustomers();
+    return { data, meta: null, error: null };
+  }
+
+  @Post('quotes/calculate')
   @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
   async calculateQuote(@Body() body: any) {
     const dto = CalculateQuoteSchema.parse(body);
@@ -32,7 +46,7 @@ export class QuotesController {
     return { data, meta: null, error: null };
   }
 
-  @Post()
+  @Post('quotes')
   @Roles('admin', 'sales_rep')
   async createQuote(@Body() body: any, @Req() req: any) {
     const dto = CreateQuoteSchema.parse(body);
@@ -40,14 +54,14 @@ export class QuotesController {
     return { data, meta: null, error: null };
   }
 
-  @Get(':id')
+  @Get('quotes/:id')
   @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
   async getQuote(@Param('id') id: string) {
     const data = await this.quotesService.getQuoteById(id);
     return { data, meta: null, error: null };
   }
 
-  @Patch('lines/:lineId')
+  @Patch('quotes/lines/:lineId')
   @Roles('admin', 'sales_rep')
   async updateLine(@Param('lineId') lineId: string, @Body() body: any) {
     const dto = UpdateQuoteLineSchema.parse(body);
@@ -55,7 +69,7 @@ export class QuotesController {
     return { data, meta: null, error: null };
   }
 
-  @Post('lines/:lineId/comments')
+  @Post('quotes/lines/:lineId/comments')
   @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
   async addLineComment(@Param('lineId') lineId: string, @Body() body: any, @Req() req: any) {
     const dto = CreateLineCommentSchema.parse(body);
