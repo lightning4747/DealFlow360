@@ -206,30 +206,59 @@ export default function LoginPage() {
             </form>
 
             {/* Quick Demo Switcher */}
-            <div className="pt-4 border-t border-[#1f1f1f] space-y-2">
-              <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
-                Quick-Select Persona (FR-03 RBAC)
+            <div className="pt-4 border-t border-[#1f1f1f] space-y-4">
+              <div className="space-y-2">
+                <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
+                  Quick-Select Internal Staff Persona (FR-03 RBAC)
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {DEMO_PERSONAS.map((p) => (
+                    <button
+                      key={p.email}
+                      type="button"
+                      onClick={() => {
+                        setEmail(p.email);
+                        setPassword('password123');
+                      }}
+                      className={`text-left p-2.5 rounded border transition ${
+                        email === p.email
+                          ? 'border-white bg-[#1a1a1a]'
+                          : 'border-[#222] bg-[#111] hover:border-[#444]'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold text-white">{p.role}</div>
+                      <div className="text-[11px] text-gray-400 font-mono">{p.email}</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">{p.desc}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-1 gap-2">
-                {DEMO_PERSONAS.map((p) => (
-                  <button
-                    key={p.email}
-                    type="button"
-                    onClick={() => {
-                      setEmail(p.email);
-                      setPassword('password123');
-                    }}
-                    className={`text-left p-2.5 rounded border transition ${
-                      email === p.email
-                        ? 'border-white bg-[#1a1a1a]'
-                        : 'border-[#222] bg-[#111] hover:border-[#444]'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold text-white">{p.role}</div>
-                    <div className="text-[11px] text-gray-400 font-mono">{p.email}</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">{p.desc}</div>
-                  </button>
-                ))}
+
+              {/* Quick Customer Accounts Select */}
+              <div className="space-y-1 pt-2 border-t border-[#1f1f1f]">
+                <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
+                  Quick-Select Customer Account (Portal User)
+                </div>
+                <select
+                  onChange={(e) => {
+                    const selected = DEMO_CUSTOMER_ACCOUNTS.find((c) => c.email === e.target.value);
+                    if (selected) {
+                      setActiveTab('customer');
+                      setCustomerEmail(selected.email);
+                      if (selected.defaultQuoteId) {
+                        setQuoteId(selected.defaultQuoteId);
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white focus:outline-none focus:border-white transition cursor-pointer"
+                >
+                  <option value="">-- Choose a Customer Account to Test Portal --</option>
+                  {DEMO_CUSTOMER_ACCOUNTS.map((c) => (
+                    <option key={c.email} value={c.email}>
+                      {c.company} ({c.name}) - Tier: {c.tier}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
