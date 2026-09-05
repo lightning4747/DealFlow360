@@ -6,8 +6,9 @@ export const QuoteLineItemInputSchema = z.object({
   productId: z.string().uuid(),
   variantId: z.string().uuid().optional().nullable(),
   quantity: z.number().int().positive(),
-  unitPrice: z.number().positive(),
-  unitCost: z.number().nonnegative().default(0),
+  // Accepted for backwards-compatible clients but ignored by the API.
+  unitPrice: z.number().positive().optional().default(0),
+  unitCost: z.number().nonnegative().optional().default(0),
   discountPct: z.number().min(0).max(100).default(0),
   lineType: LineTypeEnum.default('one_time'),
 });
@@ -64,7 +65,6 @@ export type CreateQuoteDto = z.infer<typeof CreateQuoteSchema>;
 
 export const UpdateQuoteLineSchema = z.object({
   quantity: z.number().int().positive().optional(),
-  unitPrice: z.number().positive().optional(),
   discountPct: z.number().min(0).max(100).optional(),
 });
 export type UpdateQuoteLineDto = z.infer<typeof UpdateQuoteLineSchema>;

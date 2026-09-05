@@ -364,8 +364,13 @@ Correction
 • Treat persisted quote values as immutable snapshots after submission.
 
 Dependencies
-
 Requires price-list rules, tenant/customer-tier resolution, product variant validation, and quote revision semantics.
+
+### Remediation status — P0-6
+
+The quotation calculation and creation paths now resolve `basePrice` and `unitCost` from the active product catalog by product ID. Client-supplied financial values are ignored and cannot determine quote totals, costs, margins, or BRS. Line updates also reload catalog pricing and no longer accept a price override.
+
+The API now rejects unknown product IDs and preserves the catalog-derived values in persisted quote lines. Price-list selection, variant pricing, tax, and immutable submitted-quote revisions remain Phase 1 dependencies.
 
 ────────────────────
 

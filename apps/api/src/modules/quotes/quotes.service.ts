@@ -16,12 +16,12 @@ import * as crypto from 'crypto';
 export class QuotesService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: any,
-    private readonly calcService: QuoteCalculationService,
-    private readonly approvalRoutingService: ApprovalRoutingService,
+    @Inject(QuoteCalculationService) private readonly calcService: QuoteCalculationService,
+    @Inject(ApprovalRoutingService) private readonly approvalRoutingService: ApprovalRoutingService,
   ) {}
 
   async calculateQuote(dto: CalculateQuoteDto) {
-    return this.calcService.calculate(dto);
+    return this.calcService.calculate(await this.withCatalogPricing(dto));
   }
 
   async findAllQuotes() {
@@ -75,11 +75,11 @@ export class QuotesService {
     }
 
     // 2. Perform calculation
-    const calcSummary = this.calcService.calculate({
+    const calcSummary = this.calcService.calculate(await this.withCatalogPricing({
       customerId: dto.customerId,
       customerTier: customer.tier as any,
       lines: dto.lines,
-    });
+    }));
 
     const quoteNumber = `Q-${Date.now().toString().slice(-4)}`;
     const repId = user?.id || user?.sub;
@@ -201,9 +201,14 @@ export class QuotesService {
     }
 
     const newQty = dto.quantity !== undefined ? dto.quantity : existingLine.quantity;
-    const newPrice = dto.unitPrice !== undefined ? dto.unitPrice : parseFloat(existingLine.unitPrice);
+    const [product] = await this.db.select().from(products).where(eq(products.id, existingLine.productId));
+    if (!product) {
+      throw new NotFoundException(`Product ${existingLine.productId} not found`);
+    }
+
+    const newPrice = parseFloat(product.basePrice);
     const newDiscount = dto.discountPct !== undefined ? dto.discountPct : parseFloat(existingLine.discountPct);
-    const unitCost = parseFloat(existingLine.unitCost || '0');
+    const unitCost = parseFloat(product.unitCost || '0');
 
     const subtotal = newQty * newPrice;
     const lineTotal = subtotal * (1 - newDiscount / 100);
@@ -215,6 +220,7 @@ export class QuotesService {
       .set({
         quantity: newQty,
         unitPrice: newPrice.toFixed(2),
+        unitCost: unitCost.toFixed(2),
         discountPct: newDiscount.toFixed(2),
         lineTotal: lineTotal.toFixed(2),
         grossMargin: grossMargin.toFixed(2),
@@ -271,5 +277,34 @@ export class QuotesService {
         updatedAt: new Date(),
       })
       .where(eq(quotes.id, quoteId));
+  }
+
+  private async withCatalogPricing(dto: CalculateQuoteDto): Promise<CalculateQuoteDto> {
+    const productIds = [...new Set(dto.lines.map((line) => line.productId))];
+    const catalogProducts = await this.db
+      .select({
+        id: products.id,
+        category: products.category,
+        basePrice: products.basePrice,
+        unitCost: products.unitCost,
+      })
+      .from(products)
+      .where(inArray(products.id, productIds));
+    const byId = new Map<string, any>(catalogProducts.map((product: any) => [product.id, product]));
+
+    return {
+      ...dto,
+      lines: dto.lines.map((line) => {
+        const product = byId.get(line.productId);
+        if (!product) {
+          throw new NotFoundException(`Product ${line.productId} not found`);
+        }
+        return {
+          ...line,
+          unitPrice: parseFloat(product.basePrice),
+          unitCost: parseFloat(product.unitCost || '0'),
+        };
+      }),
+    };
   }
 }

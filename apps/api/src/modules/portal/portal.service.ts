@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DRIZZLE_DB } from '../database/database.module';
-import { quotes, quoteLines, products, lineComments, negotiationSessions } from '@dealflow360/database';
-import { eq } from 'drizzle-orm';
+import { magicLinks, quotes, quoteLines, products, lineComments, negotiationSessions } from '@dealflow360/database';
+import { eq, and, gt } from 'drizzle-orm';
 import { CustomerCounterProposalDto } from '@dealflow360/types';
 import { ApprovalRoutingService } from '../governance/approval-routing.service';
 import { OrderBifurcationService } from '../billing/order-bifurcation.service';
@@ -14,6 +14,22 @@ export class PortalService {
     @Inject(ApprovalRoutingService) private readonly approvalRoutingService: ApprovalRoutingService,
     @Inject(OrderBifurcationService) private readonly orderBifurcationService: OrderBifurcationService,
   ) {}
+
+  // Compatibility validation for callers migrating from token-based service APIs.
+  // HTTP portal operations must use getSanitizedQuoteBySession instead.
+  async getSanitizedQuoteByToken(token: string) {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const [magicLink] = await this.db
+      .select()
+      .from(magicLinks)
+      .where(and(eq(magicLinks.tokenHash, tokenHash), gt(magicLinks.expiresAt, new Date())));
+
+    if (!magicLink) {
+      throw new NotFoundException('Magic link is invalid or has expired');
+    }
+
+    throw new BadRequestException('Portal token must be exchanged for a signed session');
+  }
 
   async getSanitizedQuoteBySession(session: { quoteId: string; email: string }) {
     const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, session.quoteId));

@@ -7,6 +7,7 @@ import {
   Body,
   UseGuards,
   Req,
+  Inject,
 } from '@nestjs/common';
 import { QuotesService } from './quotes.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,7 +23,7 @@ import {
 @Controller('api/v1/sales')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class QuotesController {
-  constructor(private readonly quotesService: QuotesService) {}
+  constructor(@Inject(QuotesService) private readonly quotesService: QuotesService) {}
 
   @Get('quotes')
   @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
