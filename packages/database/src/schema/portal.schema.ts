@@ -32,3 +32,28 @@ export type MagicLink = typeof magicLinks.$inferSelect;
 export type NewMagicLink = typeof magicLinks.$inferInsert;
 export const insertMagicLinkSchema = createInsertSchema(magicLinks);
 export const selectMagicLinkSchema = createSelectSchema(magicLinks);
+
+// ─── negotiation_sessions ────────────────────────────────────────────────────
+export const negotiationSessions = portalSchema.table(
+  'negotiation_sessions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    quoteId: uuid('quote_id').notNull(),
+    sessionToken: varchar('session_token', { length: 128 }).notNull().unique(),
+    participantEmail: varchar('participant_email', { length: 320 }).notNull(),
+    participantName: varchar('participant_name', { length: 255 }).notNull(),
+    participantRole: varchar('participant_role', { length: 50 }).notNull().default('customer'),
+    status: varchar('status', { length: 50 }).notNull().default('active'), // active, closed, expired
+    lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().default(sql`now()`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (table) => ({
+    sessionTokenIdx: uniqueIndex('negotiation_sessions_token_idx').on(table.sessionToken),
+    quoteIdx: index('negotiation_sessions_quote_idx').on(table.quoteId),
+  }),
+);
+
+export type NegotiationSession = typeof negotiationSessions.$inferSelect;
+export type NewNegotiationSession = typeof negotiationSessions.$inferInsert;
+export const insertNegotiationSessionSchema = createInsertSchema(negotiationSessions);
+export const selectNegotiationSessionSchema = createSelectSchema(negotiationSessions);
