@@ -97,7 +97,14 @@ export default function LoginPage() {
     try {
       const result = await login(email, password);
       if (result.success) {
-        router.push('/quotations');
+        // Read user from localStorage to verify role
+        const storedUser = localStorage.getItem('df360_user');
+        const parsed = storedUser ? JSON.parse(storedUser) : null;
+        if (parsed?.role === 'customer') {
+          router.push('/portal');
+        } else {
+          router.push('/quotations');
+        }
       } else {
         setErrorMsg(result.error || 'Invalid email or password. Please check your credentials.');
       }
@@ -121,8 +128,14 @@ export default function LoginPage() {
         role: signupRole,
       });
       if (result.success) {
-        setSuccessMsg('Account created successfully! Redirecting...');
-        setTimeout(() => router.push('/quotations'), 800);
+        setSuccessMsg('Account created successfully! Redirecting to workspace...');
+        setTimeout(() => {
+          if (signupRole === 'customer') {
+            router.push('/portal');
+          } else {
+            router.push('/quotations');
+          }
+        }, 800);
       } else {
         setErrorMsg(result.error || 'Registration failed. Please check your inputs.');
       }
@@ -370,6 +383,7 @@ export default function LoginPage() {
                     <option value="sales_manager">Sales Manager</option>
                     <option value="finance">Finance &amp; Operations</option>
                     <option value="admin">Administrator</option>
+                    <option value="customer">Customer (Purchasing / Buyer)</option>
                   </select>
                 </div>
               </div>
