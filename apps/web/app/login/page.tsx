@@ -27,6 +27,44 @@ const DEMO_PERSONAS = [
   },
 ];
 
+const DEMO_CUSTOMER_ACCOUNTS = [
+  {
+    name: 'Sarah Connor',
+    email: 'procurement@acme.com',
+    company: 'Acme Corporation',
+    tier: 'Gold',
+    defaultQuoteId: 'Q-1042',
+  },
+  {
+    name: 'Hank Scorpio',
+    email: 'purchasing@globex.com',
+    company: 'Globex Corporation',
+    tier: 'Gold',
+    defaultQuoteId: 'Q-1043',
+  },
+  {
+    name: 'Peter Gibbons',
+    email: 'billing@initech.com',
+    company: 'Initech LLC',
+    tier: 'Silver',
+    defaultQuoteId: 'Q-1044',
+  },
+  {
+    name: 'Elena Rostova',
+    email: 'ops@apexlogistics.com',
+    company: 'Apex Logistics Inc',
+    tier: 'Standard',
+    defaultQuoteId: 'Q-1045',
+  },
+  {
+    name: 'Marcus Vance',
+    email: 'it-purchasing@nexushealth.org',
+    company: 'Nexus Health Systems',
+    tier: 'Platinum',
+    defaultQuoteId: 'Q-1046',
+  },
+];
+
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
@@ -200,6 +238,30 @@ export default function LoginPage() {
         {/* Customer Magic Link Form */}
         {activeTab === 'customer' && (
           <div className="p-6 bg-[#0c0c0c] border border-[#222] rounded-lg space-y-5">
+            {/* Quick Demo Customer Account Dropdown */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-300">Quick-Select Customer Account</label>
+              <select
+                onChange={(e) => {
+                  const selected = DEMO_CUSTOMER_ACCOUNTS.find((c) => c.email === e.target.value);
+                  if (selected) {
+                    setCustomerEmail(selected.email);
+                    if (selected.defaultQuoteId) {
+                      setQuoteId(selected.defaultQuoteId);
+                    }
+                  }
+                }}
+                className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white focus:outline-none focus:border-white transition"
+              >
+                <option value="">-- Choose a Customer Account --</option>
+                {DEMO_CUSTOMER_ACCOUNTS.map((c) => (
+                  <option key={c.email} value={c.email}>
+                    {c.company} ({c.name}) - Tier: {c.tier}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {magicLinkSent ? (
               <div className="space-y-3 text-center py-4">
                 <div className="text-xs font-semibold text-white">Access Link Generated</div>
@@ -207,11 +269,18 @@ export default function LoginPage() {
                   A secure customer session has been generated for{' '}
                   <span className="text-white font-mono">{customerEmail}</span>.
                 </p>
-                <div className="pt-2">
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/portal/quotes/${quoteId || 'Q-1042'}`)}
+                    className="w-full py-2 bg-white text-black rounded text-xs font-semibold hover:bg-gray-200 transition"
+                  >
+                    Enter Negotiation Room directly →
+                  </button>
                   <button
                     type="button"
                     onClick={() => setMagicLinkSent(false)}
-                    className="px-4 py-2 border border-[#333] rounded text-xs text-gray-300 hover:bg-[#1a1a1a] transition"
+                    className="w-full py-1.5 border border-[#333] rounded text-xs text-gray-300 hover:bg-[#1a1a1a] transition"
                   >
                     Send Another Link
                   </button>
