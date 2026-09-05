@@ -68,10 +68,6 @@ export default function NewQuotationPage() {
     }
   }, [isLoading, router, user]);
 
-  if (isLoading || user?.role !== 'sales_rep') {
-    return null;
-  }
-
   // 1. Load real customers from database
   useEffect(() => {
     async function loadCustomers() {
@@ -314,6 +310,10 @@ export default function NewQuotationPage() {
       setSaving(false);
     }
   };
+
+  if (isLoading || user?.role !== 'sales_rep') {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
