@@ -378,12 +378,20 @@ export default function ApprovalsPage() {
         {/* Actions / User & Refresh */}
         <div className="flex items-center gap-3">
           <Link
-            href="/admin/products"
+            href="/catalog"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
           >
             <Package className="w-3.5 h-3.5 text-blue-400" />
-            <span>Admin Catalog</span>
+            <span>Product Catalog</span>
           </Link>
+          {userRole === 'admin' && (
+            <Link
+              href="/admin/products"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
+            >
+              <span>Admin Center</span>
+            </Link>
+          )}
           <button
             onClick={fetchApprovals}
             className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"

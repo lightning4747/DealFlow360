@@ -65,7 +65,7 @@ export function AccountSwitcher() {
   // Role to destination workspace mapping
   const ROLE_WORKSPACE_MAP: Record<string, string> = {
     admin: '/admin/products',
-    sales_rep: '/admin/products',
+    sales_rep: '/catalog',
     sales_manager: '/approvals',
     finance: '/approvals',
     customer: '/customer/orders',

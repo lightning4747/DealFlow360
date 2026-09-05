@@ -29,6 +29,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           setUserRole(parsed.role);
           if (parsed.role === 'customer') {
             window.location.href = '/customer/orders';
+          } else if (parsed.role === 'sales_rep') {
+            window.location.href = '/catalog';
+          } else if (parsed.role === 'sales_manager' || parsed.role === 'finance') {
+            window.location.href = '/approvals';
           }
         }
       }
@@ -36,10 +40,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, []);
 
   const allNav = [
-    { name: 'Products Catalog', href: '/admin/products', icon: Package, roles: ['admin', 'sales_rep', 'sales_manager', 'finance'] },
-    { name: 'Customer Tiers', href: '/admin/tiers', icon: Layers, roles: ['admin', 'sales_manager', 'finance'] },
-    { name: 'Price Lists', href: '/admin/price-lists', icon: FileSpreadsheet, roles: ['admin', 'finance'] },
-    { name: 'Governance Approvals', href: '/approvals', icon: ShieldCheck, roles: ['admin', 'sales_manager', 'finance', 'sales_rep'] },
+    { name: 'Products Master', href: '/admin/products', icon: Package, roles: ['admin'] },
+    { name: 'Customer Tiers', href: '/admin/tiers', icon: Layers, roles: ['admin'] },
+    { name: 'Price Lists', href: '/admin/price-lists', icon: FileSpreadsheet, roles: ['admin'] },
+    { name: 'Governance Approvals', href: '/approvals', icon: ShieldCheck, roles: ['admin'] },
+    { name: 'Commercial Catalog', href: '/catalog', icon: Package, roles: ['admin'] },
   ];
 
   const navigation = allNav.filter((item) => item.roles.includes(userRole));
