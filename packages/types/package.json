@@ -1,0 +1,19 @@
+{
+  "name": "@dealflow360/types",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@dealflow360/config": "workspace:*",
+    "typescript": "^5.4.0"
+  }
+}

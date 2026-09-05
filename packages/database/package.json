@@ -1,0 +1,24 @@
+{
+  "name": "@dealflow360/database",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.30.0",
+    "pg": "^8.11.3",
+    "postgres": "^3.4.3"
+  },
+  "devDependencies": {
+    "@dealflow360/config": "workspace:*",
+    "@types/pg": "^8.11.2",
+    "drizzle-kit": "^0.20.14",
+    "typescript": "^5.4.0"
+  }
+}
