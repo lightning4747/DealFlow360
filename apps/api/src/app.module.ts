@@ -10,6 +10,7 @@ import { GovernanceModule } from './modules/governance/governance.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { RecommendationsModule } from './modules/recommendations/recommendations.module';
 import { PortalModule } from './modules/portal/portal.module';
+import { FulfillmentModule } from './modules/fulfillment/fulfillment.module';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
 
 @Module({
@@ -21,6 +22,7 @@ import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
     QuotesModule,
     RecommendationsModule,
     PortalModule,
+    FulfillmentModule,
     AuthModule,
     ProductsModule,
     CustomerTiersModule,
