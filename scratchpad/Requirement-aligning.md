@@ -409,6 +409,12 @@ Dependencies
 
 Requires a quote revision/proposal model and a formal approval state machine.
 
+### Remediation status — counter-offer consistency
+
+Customer counter-offers now recalculate every quote line from its canonical persisted unit price and cost inside one database transaction. The proposed discount is applied consistently to line discount, line total, gross margin, quote total, cost total, and gross-margin percentage, preventing repeated header-only discount compounding and header/line divergence.
+
+An immutable negotiation proposal and quote revision model is still required so prior customer terms remain auditable and approvals target a specific revision.
+
 ────────────────────
 
 ### P0-8 — Approval state can be bypassed or contradicted by concurrent quote edits

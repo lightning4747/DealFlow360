@@ -91,21 +91,55 @@ export class PortalService {
       throw new NotFoundException('Quote not found');
     }
 
-    // Update quote with counter discount
-    const currentTotal = parseFloat(quote.totalAmount);
     const counterDiscount = dto.counterDiscountPct;
-    const discountedTotal = (currentTotal * (1 - counterDiscount / 100)).toFixed(2);
+    const updatedQuote = await this.db.transaction(async (tx: any) => {
+      const lines = await tx
+        .select()
+        .from(quoteLines)
+        .where(eq(quoteLines.quoteId, quote.id));
+      if (lines.length === 0) {
+        throw new BadRequestException('Cannot negotiate a quote with no line items');
+      }
 
-    const [updatedQuote] = await this.db
-      .update(quotes)
-      .set({
-        status: 'under_negotiation',
-        counterDiscountPct: counterDiscount.toFixed(2),
-        totalAmount: discountedTotal,
-        updatedAt: new Date(),
-      })
-      .where(eq(quotes.id, quote.id))
-      .returning();
+      let totalAmount = 0;
+      let costTotal = 0;
+      for (const line of lines) {
+        const unitPrice = Number(line.unitPrice);
+        const unitCost = Number(line.unitCost || 0);
+        const lineTotal = Number((line.quantity * unitPrice * (1 - counterDiscount / 100)).toFixed(2));
+        const grossMargin = Number((lineTotal - line.quantity * unitCost).toFixed(2));
+        totalAmount += lineTotal;
+        costTotal += line.quantity * unitCost;
+        await tx
+          .update(quoteLines)
+          .set({
+            discountPct: counterDiscount.toFixed(2),
+            lineTotal: lineTotal.toFixed(2),
+            grossMargin: grossMargin.toFixed(2),
+          })
+          .where(eq(quoteLines.id, line.id));
+      }
+
+      totalAmount = Number(totalAmount.toFixed(2));
+      costTotal = Number(costTotal.toFixed(2));
+      const grossMarginPct = totalAmount > 0
+        ? Number((((totalAmount - costTotal) / totalAmount) * 100).toFixed(2))
+        : 0;
+
+      const [result] = await tx
+        .update(quotes)
+        .set({
+          status: 'under_negotiation',
+          counterDiscountPct: counterDiscount.toFixed(2),
+          totalAmount: totalAmount.toFixed(2),
+          costTotal: costTotal.toFixed(2),
+          grossMarginPct: grossMarginPct.toFixed(2),
+          updatedAt: new Date(),
+        })
+        .where(eq(quotes.id, quote.id))
+        .returning();
+      return result;
+    });
 
     // Create a negotiation session tracking record
     const sessionToken = crypto.randomBytes(32).toString('hex');
