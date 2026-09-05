@@ -1,11 +1,11 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, HttpCode, HttpStatus, Inject } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Public } from './decorators/auth.decorator';
-import { LoginRequestSchema, MagicLinkRequestSchema, MagicLinkVerifySchema } from '@dealflow360/types';
+import { LoginRequestSchema, SignupRequestSchema, MagicLinkRequestSchema, MagicLinkVerifySchema } from '@dealflow360/types';
 
 @Controller('api/v1')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   @Public()
   @Post(['internal/auth/login', 'auth/login'])
@@ -31,6 +31,19 @@ export class AuthController {
       password: 'password123',
     });
     const result = await this.authService.login(credentials);
+    return {
+      data: result,
+      meta: { timestamp: new Date().toISOString() },
+      error: null,
+    };
+  }
+
+  @Public()
+  @Post(['internal/auth/signup', 'auth/signup'])
+  @HttpCode(HttpStatus.CREATED)
+  async signupPost(@Body() body: any) {
+    const payload = SignupRequestSchema.parse(body);
+    const result = await this.authService.signup(payload);
     return {
       data: result,
       meta: { timestamp: new Date().toISOString() },

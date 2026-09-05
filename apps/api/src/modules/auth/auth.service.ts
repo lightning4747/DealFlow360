@@ -3,9 +3,11 @@ import {
   UnauthorizedException,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import {
   LoginRequest,
+  SignupRequest,
   AuthTokenResponse,
   MagicLinkRequest,
   MagicLinkVerify,
@@ -107,6 +109,78 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role as any,
+      },
+      tokens: {
+        accessToken,
+        refreshToken,
+        expiresIn: 900,
+        tokenType: 'Bearer',
+      },
+    };
+  }
+
+  async signup(dto: SignupRequest): Promise<AuthTokenResponse> {
+    const [existing] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, dto.email))
+      .limit(1);
+
+    if (existing) {
+      throw new ConflictException({
+        code: 'EMAIL_ALREADY_EXISTS',
+        message: 'An account with this email address already exists',
+        statusCode: 409,
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        email: dto.email,
+        name: dto.name,
+        role: dto.role as any,
+        hashedPassword,
+      })
+      .returning();
+
+    const tokenId = crypto.randomUUID();
+    const accessToken = jwt.sign(
+      {
+        sub: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        type: 'access',
+      },
+      this.jwtSecret,
+      { expiresIn: '15m' },
+    );
+
+    const refreshToken = jwt.sign(
+      {
+        sub: newUser.id,
+        tokenId,
+        type: 'refresh',
+      },
+      this.refreshSecret,
+      { expiresIn: '7d' },
+    );
+
+    if (this.redis && this.redis.status === 'ready') {
+      try {
+        await this.redis.set(`refresh:${newUser.id}:${tokenId}`, 'valid', 'EX', 7 * 24 * 3600);
+      } catch (err: any) {
+        console.warn('Could not store refresh token in Redis:', err.message);
+      }
+    }
+
+    return {
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role as any,
       },
       tokens: {
         accessToken,

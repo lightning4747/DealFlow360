@@ -29,40 +29,31 @@ export default function CustomerPortalNegotiationPage() {
   useEffect(() => {
     async function loadQuote() {
       try {
-        const res = await fetch(`${apiUrl}/portal/quotes/view?token=${token}`);
+        // Try viewing as token first
+        let res = await fetch(`${apiUrl}/portal/quotes/view?token=${token}`);
+        if (!res.ok) {
+          // If token lookup fails, try viewing directly by quote id
+          res = await fetch(`${apiUrl}/portal/quotes/${token}`);
+        }
+
         if (res.ok) {
           const json = await res.json();
-          setQuote(json.data);
-        } else {
-          // Fallback data matching Screen 11 in PNG
+          const qData = json.data?.quote || json.data;
+          const qLines = json.data?.lines || qData?.lines || [];
           setQuote({
-            id: 'qte-1042',
-            quoteNumber: 'Q-1042',
-            customerName: 'Acme Corp',
-            status: 'under_negotiation',
-            totalAmount: '2750.00',
-            currency: 'USD',
-            lines: [
-              { id: '1', productName: 'Laptop Pro 14', quantity: 2, unitPrice: '1250.00', discountPct: '12.00', lineTotal: '2200.00' },
-              { id: '2', productName: 'Extended Warranty 2yr', quantity: 1, unitPrice: '200.00', discountPct: '10.00', lineTotal: '180.00' },
-              { id: '3', productName: 'Onsite Setup Service', quantity: 1, unitPrice: '450.00', discountPct: '18.00', lineTotal: '369.00' },
-            ],
+            ...qData,
+            lines: qLines.map((l: any) => ({
+              id: l.id,
+              productName: l.product?.name || l.productName || 'Catalog Product',
+              quantity: l.quantity,
+              unitPrice: l.unitPrice,
+              discountPct: l.discountPct,
+              lineTotal: l.lineTotal,
+            })),
           });
         }
-      } catch {
-        setQuote({
-          id: 'qte-1042',
-          quoteNumber: 'Q-1042',
-          customerName: 'Acme Corp',
-          status: 'under_negotiation',
-          totalAmount: '2750.00',
-          currency: 'USD',
-          lines: [
-            { id: '1', productName: 'Laptop Pro 14', quantity: 2, unitPrice: '1250.00', discountPct: '12.00', lineTotal: '2200.00' },
-            { id: '2', productName: 'Extended Warranty 2yr', quantity: 1, unitPrice: '200.00', discountPct: '10.00', lineTotal: '180.00' },
-            { id: '3', productName: 'Onsite Setup Service', quantity: 1, unitPrice: '450.00', discountPct: '18.00', lineTotal: '369.00' },
-          ],
-        });
+      } catch (err) {
+        console.warn('Could not load live quote, fallback active:', err);
       }
     }
 

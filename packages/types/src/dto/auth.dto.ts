@@ -8,6 +8,15 @@ export const LoginRequestSchema = z.object({
 });
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 
+// Signup DTO
+export const SignupRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  name: z.string().min(2),
+  role: z.enum(['admin', 'sales_rep', 'sales_manager', 'finance', 'customer']).default('sales_rep'),
+});
+export type SignupRequest = z.infer<typeof SignupRequestSchema>;
+
 // Token payload contract
 export const JwtPayloadSchema = z.object({
   sub: z.string().uuid(),

@@ -15,6 +15,7 @@ const NAV_TABS = [
   { name: 'Deal Health', href: '/deal-health' },
   { name: 'Reports', href: '/reports' },
   { name: 'Products', href: '/products' },
+  { name: 'Customer Portal', href: '/portal' },
 ];
 
 export function AppHeader() {

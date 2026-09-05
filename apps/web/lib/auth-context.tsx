@@ -7,14 +7,15 @@ export interface UserProfile {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'sales_rep' | 'sales_manager' | 'finance';
+  role: 'admin' | 'sales_rep' | 'sales_manager' | 'finance' | 'customer';
 }
 
 interface AuthContextType {
   user: UserProfile | null;
   accessToken: string | null;
   isLoading: boolean;
-  login: (email: string, password?: string) => Promise<boolean>;
+  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (dto: { email: string; password: string; name: string; role?: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -22,7 +23,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   accessToken: null,
   isLoading: true,
-  login: async () => false,
+  login: async () => ({ success: false }),
+  signup: async () => ({ success: false }),
   logout: () => {},
 });
 
@@ -39,9 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedToken && storedUser) {
         setAccessToken(storedToken);
         setUser(JSON.parse(storedUser));
-      } else {
-        // Automatically establish active sales rep session for immediate out-of-the-box productivity
-        login('rep1@dealflow360.com', 'password123');
       }
     } catch (e) {
       console.error('Failed to load user auth from localStorage', e);
@@ -56,26 +55,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch(`${apiUrl}/internal/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
+      const json = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error('Authentication failed');
+        return { success: false, error: json?.message || 'Invalid email or password' };
       }
 
-      const json = await res.json();
-      const authData = json.data;
+      const authData = json?.data;
       if (authData?.user && authData?.tokens?.accessToken) {
         setUser(authData.user);
         setAccessToken(authData.tokens.accessToken);
         localStorage.setItem('df360_access_token', authData.tokens.accessToken);
         localStorage.setItem('df360_user', JSON.stringify(authData.user));
-        return true;
+        return { success: true };
       }
-      return false;
-    } catch (err) {
+      return { success: false, error: 'Malformed response from authentication server' };
+    } catch (err: any) {
       console.error('Login error:', err);
-      return false;
+      return { success: false, error: err.message || 'Network error reaching auth server' };
+    }
+  };
+
+  const signup = async (dto: { email: string; password: string; name: string; role?: string }) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const res = await fetch(`${apiUrl}/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: dto.email.trim(),
+          password: dto.password,
+          name: dto.name.trim(),
+          role: dto.role || 'sales_rep',
+        }),
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: json?.message || 'Registration failed' };
+      }
+
+      const authData = json?.data;
+      if (authData?.user && authData?.tokens?.accessToken) {
+        setUser(authData.user);
+        setAccessToken(authData.tokens.accessToken);
+        localStorage.setItem('df360_access_token', authData.tokens.accessToken);
+        localStorage.setItem('df360_user', JSON.stringify(authData.user));
+        return { success: true };
+      }
+      return { success: false, error: 'Registration succeeded but session could not be established' };
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      return { success: false, error: err.message || 'Network error reaching server' };
     }
   };
 
@@ -88,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, accessToken, isLoading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );

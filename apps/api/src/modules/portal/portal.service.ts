@@ -198,5 +198,164 @@ export class PortalService {
       bifurcation: bifurcationResult,
     };
   }
+
+  async getCustomerQuotesByEmail(customerEmail: string) {
+    // Look up customer by email in customers table
+    const [cust] = await this.db
+      .select()
+      .from(customers)
+      .where(eq(customers.email, customerEmail));
+
+    if (!cust) {
+      return [];
+    }
+
+    const customerQuoteList = await this.db
+      .select({
+        id: quotes.id,
+        quoteNumber: quotes.quoteNumber,
+        status: quotes.status,
+        totalAmount: quotes.totalAmount,
+        counterDiscountPct: quotes.counterDiscountPct,
+        expiresAt: quotes.expiresAt,
+        createdAt: quotes.createdAt,
+        updatedAt: quotes.updatedAt,
+      })
+      .from(quotes)
+      .where(eq(quotes.customerId, cust.id))
+      .orderBy(desc(quotes.createdAt));
+
+    return customerQuoteList;
+  }
+
+  async getSanitizedQuoteById(quoteId: string, customerEmail?: string) {
+    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, quoteId));
+    if (!quote) {
+      throw new NotFoundException('Quote not found');
+    }
+
+    const lines = await this.db
+      .select({
+        id: quoteLines.id,
+        productId: quoteLines.productId,
+        quantity: quoteLines.quantity,
+        unitPrice: quoteLines.unitPrice,
+        discountPct: quoteLines.discountPct,
+        lineTotal: quoteLines.lineTotal,
+        lineType: quoteLines.lineType,
+      })
+      .from(quoteLines)
+      .where(eq(quoteLines.quoteId, quote.id));
+
+    const linesWithProducts = await Promise.all(
+      lines.map(async (l: any) => {
+        const [prod] = await this.db
+          .select({
+            id: products.id,
+            name: products.name,
+            sku: products.sku,
+            category: products.category,
+            description: products.description,
+          })
+          .from(products)
+          .where(eq(products.id, l.productId));
+        return {
+          ...l,
+          product: prod || null,
+        };
+      })
+    );
+
+    return {
+      quote: {
+        id: quote.id,
+        quoteNumber: quote.quoteNumber,
+        status: quote.status,
+        totalAmount: quote.totalAmount,
+        expiresAt: quote.expiresAt,
+        counterDiscountPct: quote.counterDiscountPct,
+      },
+      customerEmail: customerEmail || 'customer@dealflow360.com',
+      lines: linesWithProducts,
+    };
+  }
+
+  async submitCounterProposalById(quoteId: string, dto: CustomerCounterProposalDto) {
+    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, quoteId));
+    if (!quote) {
+      throw new NotFoundException('Quote not found');
+    }
+
+    const currentTotal = parseFloat(quote.totalAmount);
+    const counterDiscount = dto.counterDiscountPct;
+    const discountedTotal = (currentTotal * (1 - counterDiscount / 100)).toFixed(2);
+
+    const [updatedQuote] = await this.db
+      .update(quotes)
+      .set({
+        status: 'under_negotiation',
+        counterDiscountPct: counterDiscount.toFixed(2),
+        totalAmount: discountedTotal,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotes.id, quote.id))
+      .returning();
+
+    if (counterDiscount > 15) {
+      await this.approvalRoutingService.submitQuote(quote.id, {
+        id: 'external-customer',
+        role: 'customer',
+        name: dto.participantName,
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Counter proposal submitted successfully',
+      quote: updatedQuote,
+    };
+  }
+
+  async confirmQuoteById(quoteId: string, participantName?: string) {
+    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, quoteId));
+    if (!quote) {
+      throw new NotFoundException('Quote not found');
+    }
+
+    const counterDiscount = parseFloat(quote.counterDiscountPct || '0');
+
+    if (counterDiscount > 15 && quote.status !== 'sent') {
+      const submission = await this.approvalRoutingService.submitQuote(quote.id, {
+        id: 'external-customer',
+        role: 'customer',
+        name: participantName || 'Authorized Customer',
+      });
+      return {
+        success: true,
+        status: 'pending_approval',
+        message: 'Order terms submitted for governance approval.',
+        quote: submission.quote || quote,
+      };
+    }
+
+    const bifurcationResult = await this.orderBifurcationService.confirmQuote(quote.id, {
+      id: 'customer-portal',
+      role: 'customer',
+      name: participantName || 'Authorized Customer',
+    });
+
+    const [confirmedQuote] = await this.db
+      .select()
+      .from(quotes)
+      .where(eq(quotes.id, quote.id));
+
+    return {
+      success: true,
+      status: 'confirmed',
+      message: 'Quotation confirmed! Order is now approved and ready for warehouse fulfillment.',
+      quote: confirmedQuote,
+      bifurcation: bifurcationResult,
+    };
+  }
 }
 
