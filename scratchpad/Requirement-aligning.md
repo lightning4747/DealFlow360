@@ -6,6 +6,31 @@ Requirements source:  docs/FUNCTIONAL_REQUIREMENTS.md .
 
 Overall assessment: DealFlow360 is a partially wired prototype with several live backend paths, but it is not currently safe to treat as a production quotation-to-cash system. The most serious problems are unauthorized data access, client-controlled financial values, insecure customer portal operations, inconsistent workflow state transitions, and frontend behavior that reports success without confirmed backend persistence.
 
+## Current execution workstreams
+
+### Workstream 1 — Replace frontend mock data with authenticated API state
+
+Scope: remove hardcoded fulfillment rows and fallback product/demo values, wait for authentication hydration before protected requests, and connect fulfillment inventory/warehouse views to `/fulfillment/warehouses` and `/fulfillment/stock`. Billing pages must use the existing `/internal/invoices` and `/internal/subscriptions` contracts and surface API errors rather than rendering fabricated records.
+
+Implemented in this slice:
+
+- Fulfillment now loads active warehouses and stock from the backend.
+- Invoice and subscription loading waits until the stored JWT has been restored, preventing the initial unauthenticated request that produced 401 responses.
+- Fulfillment empty and error states reflect persisted API data.
+
+Remaining mock surfaces are tracked separately and must be removed page by page; Quick-Select Demo Personas remain intentionally unchanged.
+
+### Workstream 2 — Seed deterministic end-to-end scenarios
+
+Scope: provide repeatable records for quotation, approval, inventory split/backorder, one-time invoice, recurring subscription, and billing schedule testing. Seed records use stable business identifiers and are safe to rerun without accumulating duplicate schedules or fulfillment plans.
+
+Implemented in this slice:
+
+- Extended demo quote seeding with an active subscription, six billing schedule periods, a sent invoice with invoice lines, a fulfillment split, and an open backorder.
+- Existing product, customer, warehouse, and RBAC demo records remain the source of those relationships.
+
+Execution order: apply schema/migrations, run the base seed, then run the demo quote/scenario seed, and validate each protected UI/API flow with a seeded staff account.
+
 No repository code was changed during this audit.
 
 ────────────────────

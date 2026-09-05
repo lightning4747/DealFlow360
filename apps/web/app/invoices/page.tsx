@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppHeader } from '@/components/app-header';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
 
 interface InvoiceItem {
   id: string;
@@ -45,6 +46,7 @@ interface InvoiceDetail extends InvoiceItem {
 }
 
 export default function InvoicesPage() {
+  const { isLoading: authLoading } = useAuth();
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,8 +58,8 @@ export default function InvoicesPage() {
   const [voidActionLoading, setVoidActionLoading] = useState(false);
 
   useEffect(() => {
-    fetchInvoices();
-  }, [filterStatus]);
+    if (!authLoading) fetchInvoices();
+  }, [filterStatus, authLoading]);
 
   const fetchInvoices = async () => {
     try {

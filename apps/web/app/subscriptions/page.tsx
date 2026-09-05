@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppHeader } from '@/components/app-header';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
 
 interface SubscriptionItem {
   id: string;
@@ -40,6 +41,7 @@ interface SubscriptionDetail extends SubscriptionItem {
 }
 
 export default function SubscriptionsPage() {
+  const { isLoading: authLoading } = useAuth();
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,8 +63,8 @@ export default function SubscriptionsPage() {
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchSubscriptions();
-  }, [filterStatus]);
+    if (!authLoading) fetchSubscriptions();
+  }, [filterStatus, authLoading]);
 
   const fetchSubscriptions = async () => {
     try {

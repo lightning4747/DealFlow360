@@ -627,6 +627,20 @@ async function runMigrations() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `;
+    await sqlClient`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'fulfillment' AND table_name = 'backorders' AND column_name = 'productid'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'fulfillment' AND table_name = 'backorders' AND column_name = 'product_id'
+        ) THEN
+          ALTER TABLE fulfillment.backorders RENAME COLUMN "productid" TO product_id;
+        END IF;
+      END $$;
+    `;
 
     // PostGIS Distance Calculation Helper Function
     await sqlClient`
