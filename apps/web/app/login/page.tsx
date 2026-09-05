@@ -36,29 +36,25 @@ const CUSTOMER_PERSONAS = [
     role: 'Acme Corp (Gold Tier)',
     contact: 'Sarah Connor',
     email: 'procurement@acme.com',
-    quoteId: 'Q-1042',
-    desc: 'Reviewing hardware quote with requested 18% discount',
+    desc: 'Multiple purchases: hardware, cloud SLA, and accessories',
   },
   {
     role: 'Globex Corp (Silver Tier)',
     contact: 'Hank Scorpio',
     email: 'purchasing@globex.com',
-    quoteId: 'Q-1043',
-    desc: 'Reviewing enterprise server & switch bundle',
+    desc: 'Enterprise server clusters and network switches',
   },
   {
     role: 'Initech LLC (Bronze Tier)',
     contact: 'Peter Gibbons',
     email: 'billing@initech.com',
-    quoteId: 'Q-1044',
-    desc: 'Reviewing SaaS platform expansion quote',
+    desc: 'SaaS platform licenses and support packages',
   },
   {
     role: 'Nexus Health (Platinum Tier)',
     contact: 'Marcus Vance',
     email: 'it-purchasing@nexushealth.org',
-    quoteId: 'Q-1046',
-    desc: 'Mission-critical healthcare deployment',
+    desc: 'Hospital campus deployments and compliance retention',
   },
 ];
 
@@ -66,56 +62,77 @@ export default function LoginPage() {
   const router = useRouter();
   const { login, signup } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'signin' | 'signup' | 'customer'>('signin');
-  
-  // Sign In State
-  const [email, setEmail] = useState('rep1@dealflow360.com');
-  const [password, setPassword] = useState('password123');
+  // 4 Explicit Primary Tabs
+  const [activeTab, setActiveTab] = useState<'customer_login' | 'staff_login' | 'customer_magic' | 'signup'>('customer_login');
+
+  // Customer Login State
+  const [customerEmail, setCustomerEmail] = useState('procurement@acme.com');
+  const [customerPassword, setCustomerPassword] = useState('password123');
+
+  // Staff Login State
+  const [staffEmail, setStaffEmail] = useState('rep1@dealflow360.com');
+  const [staffPassword, setStaffPassword] = useState('password123');
 
   // Sign Up State
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('password123');
-  const [signupRole, setSignupRole] = useState<'sales_rep' | 'sales_manager' | 'finance' | 'admin'>('sales_rep');
+  const [signupRole, setSignupRole] = useState<'customer' | 'sales_rep' | 'sales_manager' | 'finance' | 'admin'>('customer');
 
-  // Customer Magic Link State
-  const [quoteId, setQuoteId] = useState('Q-1042');
-  const [customerEmail, setCustomerEmail] = useState('procurement@acme.com');
+  // Magic Link State
+  const [magicLinkEmail, setMagicLinkEmail] = useState('procurement@acme.com');
+  const [magicLinkQuoteId, setMagicLinkQuoteId] = useState('Q-1042');
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [generatedPortalUrl, setGeneratedPortalUrl] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [actionLoadingEmail, setActionLoadingEmail] = useState<string | null>(null);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [generatedPortalUrl, setGeneratedPortalUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const handleInternalLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  // Customer Email + Password Login Handler
+  const handleCustomerLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
     setLoading(true);
     try {
-      const result = await login(email, password);
+      const result = await login(customerEmail, customerPassword);
       if (result.success) {
-        // Read user from localStorage to verify role
-        const storedUser = localStorage.getItem('df360_user');
-        const parsed = storedUser ? JSON.parse(storedUser) : null;
-        if (parsed?.role === 'customer') {
-          router.push('/portal');
-        } else {
-          router.push('/quotations');
-        }
+        setSuccessMsg('Customer verified. Loading your orders & quotations...');
+        setTimeout(() => router.push('/portal'), 600);
       } else {
-        setErrorMsg(result.error || 'Invalid email or password. Please check your credentials.');
+        setErrorMsg(result.error || 'Invalid customer credentials. (Default password: password123)');
       }
     } catch {
-      setErrorMsg('Failed to connect to authentication gateway.');
+      setErrorMsg('Failed to connect to authentication server.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInternalSignup = async (e: React.FormEvent) => {
+  // Staff Login Handler
+  const handleStaffLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+    try {
+      const result = await login(staffEmail, staffPassword);
+      if (result.success) {
+        router.push('/quotations');
+      } else {
+        setErrorMsg(result.error || 'Invalid staff credentials. (Default password: password123)');
+      }
+    } catch {
+      setErrorMsg('Failed to connect to authentication server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sign Up Handler
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -128,7 +145,7 @@ export default function LoginPage() {
         role: signupRole,
       });
       if (result.success) {
-        setSuccessMsg('Account created successfully! Redirecting to workspace...');
+        setSuccessMsg('Account registered successfully! Redirecting...');
         setTimeout(() => {
           if (signupRole === 'customer') {
             router.push('/portal');
@@ -137,7 +154,7 @@ export default function LoginPage() {
           }
         }, 800);
       } else {
-        setErrorMsg(result.error || 'Registration failed. Please check your inputs.');
+        setErrorMsg(result.error || 'Registration failed. Check your inputs.');
       }
     } catch {
       setErrorMsg('Network error registering account.');
@@ -146,69 +163,64 @@ export default function LoginPage() {
     }
   };
 
-  const handleCustomerMagicLink = async (e?: React.FormEvent, customEmail?: string, customQuoteId?: string) => {
-    if (e) e.preventDefault();
+  // Magic Link Handler
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
     setLoading(true);
-    const targetEmail = customEmail || customerEmail;
-    const targetQuote = customQuoteId || quoteId;
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
       const res = await fetch(`${apiUrl}/portal/auth/magic-link/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: targetEmail, quoteId: targetQuote || undefined }),
+        body: JSON.stringify({ email: magicLinkEmail, quoteId: magicLinkQuoteId || undefined }),
       });
 
       const json = await res.json().catch(() => null);
       if (res.ok && json?.data?.portalUrl) {
         setMagicLinkSent(true);
         setGeneratedPortalUrl(json.data.portalUrl);
-        return json.data.portalUrl;
       } else {
-        setErrorMsg(json?.message || 'Failed to request magic link. Check quotation ID & email.');
-        return null;
+        setErrorMsg(json?.message || 'Failed to generate magic link. Check quotation ID & email.');
       }
     } catch {
-      setErrorMsg('Network error connecting to portal service.');
-      return null;
+      setErrorMsg('Network error requesting magic link.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDirectStaffLogin = async (staffEmail: string) => {
+  // 1-Click Fast Actions
+  const handleDirectCustomerLogin = async (emailToLogin: string) => {
     setErrorMsg(null);
-    setActionLoadingEmail(staffEmail);
+    setActionLoadingEmail(emailToLogin);
     try {
-      const result = await login(staffEmail, 'password123');
+      const result = await login(emailToLogin, 'password123');
       if (result.success) {
-        router.push('/quotations');
+        router.push('/portal');
       } else {
-        setErrorMsg(result.error || `Could not authenticate as ${staffEmail}`);
+        setErrorMsg(result.error || `Could not login as ${emailToLogin}`);
       }
     } catch {
-      setErrorMsg('Authentication gateway error.');
+      setErrorMsg('Authentication error.');
     } finally {
       setActionLoadingEmail(null);
     }
   };
 
-  const handleDirectCustomerEnter = async (cEmail: string, cQuoteId: string) => {
+  const handleDirectStaffLogin = async (emailToLogin: string) => {
     setErrorMsg(null);
-    setActionLoadingEmail(cEmail);
+    setActionLoadingEmail(emailToLogin);
     try {
-      // Direct authenticated login for customer account
-      const result = await login(cEmail, 'password123');
+      const result = await login(emailToLogin, 'password123');
       if (result.success) {
-        router.push('/portal');
+        router.push('/quotations');
       } else {
-        // Fallback to direct quote portal if password mismatch
-        router.push(`/portal/quotes/${cQuoteId}`);
+        setErrorMsg(result.error || `Could not login as ${emailToLogin}`);
       }
     } catch {
-      router.push(`/portal/quotes/${cQuoteId}`);
+      setErrorMsg('Authentication error.');
     } finally {
       setActionLoadingEmail(null);
     }
@@ -221,44 +233,55 @@ export default function LoginPage() {
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-white">DealFlow360</h1>
           <p className="text-xs text-gray-400">
-            Intelligent B2B Sales Operations, Governed CPQ &amp; Customer Negotiation Portal
+            Intelligent B2B Sales Operations &amp; Customer Purchasing Portal
           </p>
         </div>
 
-        {/* Auth Mode Tabs */}
-        <div className="grid grid-cols-3 p-1 bg-[#111] border border-[#222] rounded-lg text-xs font-semibold">
+        {/* 4 CLEAR AUTH MODE TABS */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 p-1 bg-[#111] border border-[#222] rounded-lg text-xs font-semibold gap-1">
           <button
             type="button"
-            onClick={() => { setActiveTab('signin'); setErrorMsg(null); setSuccessMsg(null); }}
-            className={`py-2 rounded transition ${
-              activeTab === 'signin'
-                ? 'bg-white text-black'
-                : 'text-gray-400 hover:text-white'
+            onClick={() => { setActiveTab('customer_login'); setErrorMsg(null); setSuccessMsg(null); }}
+            className={`py-2 px-1 rounded transition text-center ${
+              activeTab === 'customer_login'
+                ? 'bg-emerald-500 text-black font-bold shadow'
+                : 'text-gray-300 hover:text-white'
+            }`}
+          >
+            Customer Login
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab('staff_login'); setErrorMsg(null); setSuccessMsg(null); }}
+            className={`py-2 px-1 rounded transition text-center ${
+              activeTab === 'staff_login'
+                ? 'bg-white text-black font-bold shadow'
+                : 'text-gray-300 hover:text-white'
             }`}
           >
             Staff Sign In
           </button>
           <button
             type="button"
-            onClick={() => { setActiveTab('signup'); setErrorMsg(null); setSuccessMsg(null); }}
-            className={`py-2 rounded transition ${
-              activeTab === 'signup'
-                ? 'bg-white text-black'
-                : 'text-gray-400 hover:text-white'
+            onClick={() => { setActiveTab('customer_magic'); setErrorMsg(null); setSuccessMsg(null); }}
+            className={`py-2 px-1 rounded transition text-center ${
+              activeTab === 'customer_magic'
+                ? 'bg-white text-black font-bold shadow'
+                : 'text-gray-300 hover:text-white'
             }`}
           >
-            Create Staff Account
+            Magic Link
           </button>
           <button
             type="button"
-            onClick={() => { setActiveTab('customer'); setErrorMsg(null); setSuccessMsg(null); }}
-            className={`py-2 rounded transition ${
-              activeTab === 'customer'
-                ? 'bg-white text-black'
-                : 'text-gray-400 hover:text-white'
+            onClick={() => { setActiveTab('signup'); setErrorMsg(null); setSuccessMsg(null); }}
+            className={`py-2 px-1 rounded transition text-center ${
+              activeTab === 'signup'
+                ? 'bg-white text-black font-bold shadow'
+                : 'text-gray-300 hover:text-white'
             }`}
           >
-            Customer Magic Link
+            Sign Up
           </button>
         </div>
 
@@ -274,25 +297,87 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* 1. Internal Staff Login Form */}
-        {activeTab === 'signin' && (
-          <div className="p-6 bg-[#0c0c0c] border border-[#222] rounded-lg space-y-5">
-            <div>
-              <h2 className="text-sm font-semibold text-white">Enterprise Workspace Login</h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                Sign in with your organizational role credentials to access governed quotes and approvals.
-              </p>
+        {/* 1. CUSTOMER LOGIN FORM (EMAIL + PASSWORD) */}
+        {activeTab === 'customer_login' && (
+          <div className="p-6 bg-[#0c0c0c] border border-emerald-900/40 rounded-lg space-y-5">
+            <div className="flex items-center justify-between border-b border-[#222] pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <h2 className="text-sm font-bold text-white">Customer Account Login</h2>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Log in to your customer account to view all past orders, active quotations, and negotiate terms.
+                </p>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                CUSTOMER PORTAL
+              </span>
             </div>
 
-            <form onSubmit={handleInternalLogin} className="space-y-4">
+            <form onSubmit={handleCustomerLogin} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-300">Email Address</label>
+                <label className="text-xs font-medium text-gray-300">Customer Email Address</label>
                 <input
                   type="email"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 transition font-mono"
+                  placeholder="procurement@acme.com"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-gray-300">Password</label>
+                  <span className="text-[11px] text-gray-500 font-mono">Demo: password123</span>
+                </div>
+                <input
+                  type="password"
+                  required
+                  value={customerPassword}
+                  onChange={(e) => setCustomerPassword(e.target.value)}
+                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 transition"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2 bg-emerald-500 text-black rounded text-xs font-bold hover:bg-emerald-400 transition disabled:opacity-50"
+              >
+                {loading ? 'Authenticating Customer...' : 'Log In to Customer Portal →'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* 2. STAFF SIGN IN FORM */}
+        {activeTab === 'staff_login' && (
+          <div className="p-6 bg-[#0c0c0c] border border-[#222] rounded-lg space-y-5">
+            <div className="flex items-center justify-between border-b border-[#222] pb-3">
+              <div>
+                <h2 className="text-sm font-bold text-white">Staff &amp; Enterprise Login</h2>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Access internal pipeline, approval governance, fulfillment, and billing engines.
+                </p>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
+                STAFF WORKSPACE
+              </span>
+            </div>
+
+            <form onSubmit={handleStaffLogin} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-300">Staff Work Email</label>
+                <input
+                  type="email"
+                  required
+                  value={staffEmail}
+                  onChange={(e) => setStaffEmail(e.target.value)}
+                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition font-mono"
                   placeholder="name@dealflow360.com"
                 />
               </div>
@@ -300,13 +385,13 @@ export default function LoginPage() {
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-medium text-gray-300">Password</label>
-                  <span className="text-[11px] text-gray-500 font-mono">Default: password123</span>
+                  <span className="text-[11px] text-gray-500 font-mono">Demo: password123</span>
                 </div>
                 <input
                   type="password"
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={staffPassword}
+                  onChange={(e) => setStaffPassword(e.target.value)}
                   className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition"
                   placeholder="••••••••"
                 />
@@ -315,106 +400,29 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2 bg-white text-black rounded text-xs font-semibold hover:bg-gray-200 transition disabled:opacity-50"
+                className="w-full py-2 bg-white text-black rounded text-xs font-bold hover:bg-gray-200 transition disabled:opacity-50"
               >
-                {loading ? 'Authenticating...' : 'Sign In to Workspace'}
+                {loading ? 'Authenticating Staff...' : 'Sign In to Workspace →'}
               </button>
             </form>
           </div>
         )}
 
-        {/* 2. Staff Registration / Signup Form */}
-        {activeTab === 'signup' && (
+        {/* 3. CUSTOMER MAGIC LINK FORM */}
+        {activeTab === 'customer_magic' && (
           <div className="p-6 bg-[#0c0c0c] border border-[#222] rounded-lg space-y-5">
             <div>
-              <h2 className="text-sm font-semibold text-white">Register New Staff User</h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                Create a new enterprise account with an assigned RBAC role.
-              </p>
-            </div>
-
-            <form onSubmit={handleInternalSignup} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-300">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={signupName}
-                  onChange={(e) => setSignupName(e.target.value)}
-                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition"
-                  placeholder="e.g. Eleanor Vance"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-300">Work Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={signupEmail}
-                  onChange={(e) => setSignupEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition"
-                  placeholder="name@dealflow360.com"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-300">Password</label>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
-                    className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition"
-                    placeholder="Min 8 chars"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-300">Assigned Role</label>
-                  <select
-                    value={signupRole}
-                    onChange={(e: any) => setSignupRole(e.target.value)}
-                    className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white focus:outline-none focus:border-white transition"
-                  >
-                    <option value="sales_rep">Sales Representative</option>
-                    <option value="sales_manager">Sales Manager</option>
-                    <option value="finance">Finance &amp; Operations</option>
-                    <option value="admin">Administrator</option>
-                    <option value="customer">Customer (Purchasing / Buyer)</option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 bg-white text-black rounded text-xs font-semibold hover:bg-gray-200 transition disabled:opacity-50"
-              >
-                {loading ? 'Creating Account...' : 'Complete Registration'}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* 3. Customer Magic Link Form */}
-        {activeTab === 'customer' && (
-          <div className="p-6 bg-[#0c0c0c] border border-[#222] rounded-lg space-y-5">
-            <div>
-              <h2 className="text-sm font-semibold text-white">Customer Portal Access</h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                Generate a secure, single-use token link to enter the live customer negotiation room.
+              <h2 className="text-sm font-bold text-white">Single-Use Magic Link Access</h2>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Request a secure, single-use token to open an individual negotiation room without a password.
               </p>
             </div>
 
             {magicLinkSent && generatedPortalUrl ? (
               <div className="space-y-3 text-center py-4 bg-[#111] border border-[#222] rounded-lg p-4">
                 <div className="text-xs font-semibold text-emerald-400">✓ Token Generated Successfully</div>
-                <p className="text-xs text-gray-300 leading-relaxed">
-                  Direct access session created for{' '}
-                  <span className="text-white font-mono">{customerEmail}</span>.
+                <p className="text-xs text-gray-300">
+                  Access session ready for <span className="text-white font-mono">{magicLinkEmail}</span>.
                 </p>
                 <div className="pt-2 flex flex-col gap-2">
                   <button
@@ -434,15 +442,15 @@ export default function LoginPage() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={(e) => handleCustomerMagicLink(e)} className="space-y-4">
+              <form onSubmit={handleMagicLink} className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-300">Customer Email</label>
                   <input
                     type="email"
                     required
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition"
+                    value={magicLinkEmail}
+                    onChange={(e) => setMagicLinkEmail(e.target.value)}
+                    className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition font-mono"
                     placeholder="procurement@acme.com"
                   />
                 </div>
@@ -451,8 +459,8 @@ export default function LoginPage() {
                   <label className="text-xs font-medium text-gray-300">Quotation ID / Number</label>
                   <input
                     type="text"
-                    value={quoteId}
-                    onChange={(e) => setQuoteId(e.target.value)}
+                    value={magicLinkQuoteId}
+                    onChange={(e) => setMagicLinkQuoteId(e.target.value)}
                     className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition font-mono"
                     placeholder="e.g. Q-1042"
                   />
@@ -463,26 +471,149 @@ export default function LoginPage() {
                   disabled={loading}
                   className="w-full py-2 bg-white text-black rounded text-xs font-semibold hover:bg-gray-200 transition disabled:opacity-50"
                 >
-                  {loading ? 'Generating...' : 'Request Customer Magic Link'}
+                  {loading ? 'Generating...' : 'Request Single-Use Magic Link'}
                 </button>
               </form>
             )}
           </div>
         )}
 
-        {/* 4. Quick-Select Demo Personas (1-Click Actions Without Unwanted Tab Toggling) */}
+        {/* 4. USER SIGN UP / REGISTRATION FORM */}
+        {activeTab === 'signup' && (
+          <div className="p-6 bg-[#0c0c0c] border border-[#222] rounded-lg space-y-5">
+            <div>
+              <h2 className="text-sm font-bold text-white">Create New Account</h2>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Register as a Customer Buyer or Enterprise Staff Member.
+              </p>
+            </div>
+
+            <form onSubmit={handleSignup} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-300">Account Type (Role)</label>
+                <select
+                  value={signupRole}
+                  onChange={(e: any) => setSignupRole(e.target.value)}
+                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white focus:outline-none focus:border-white transition"
+                >
+                  <option value="customer">Customer (Buyer / Purchasing Account)</option>
+                  <option value="sales_rep">Sales Representative</option>
+                  <option value="sales_manager">Sales Manager</option>
+                  <option value="finance">Finance &amp; Operations</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-300">Full Name or Company Representative</label>
+                <input
+                  type="text"
+                  required
+                  value={signupName}
+                  onChange={(e) => setSignupName(e.target.value)}
+                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition"
+                  placeholder="e.g. Sarah Connor"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-300">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={signupEmail}
+                  onChange={(e) => setSignupEmail(e.target.value)}
+                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition font-mono"
+                  placeholder="buyer@company.com"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-300">Password</label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={signupPassword}
+                  onChange={(e) => setSignupPassword(e.target.value)}
+                  className="w-full px-3 py-2 bg-black border border-[#333] rounded text-xs text-white placeholder-gray-600 focus:outline-none focus:border-white transition"
+                  placeholder="Minimum 8 characters"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2 bg-white text-black rounded text-xs font-bold hover:bg-gray-200 transition disabled:opacity-50"
+              >
+                {loading ? 'Creating Account...' : 'Complete Registration'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* 5. 1-CLICK QUICK-SELECT DEMO PERSONAS CONTAINER */}
         <div className="p-6 bg-[#0c0c0c] border border-[#222] rounded-lg space-y-5">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-semibold text-white uppercase tracking-wider">
+            <div className="text-xs font-bold text-white uppercase tracking-wider">
               Quick-Select Demo Personas
             </div>
-            <span className="text-[10px] text-gray-500 font-mono">1-Click Fast Switch</span>
+            <span className="text-[10px] text-gray-500 font-mono">1-Click Immediate Login</span>
           </div>
 
-          {/* Section A: Internal Enterprise Staff */}
+          {/* Section A: Customer Accounts */}
           <div className="space-y-2">
+            <div className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              Customer Buyer Accounts (Customer Portal)
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {CUSTOMER_PERSONAS.map((c) => (
+                <div
+                  key={c.email}
+                  className="p-3 rounded border border-emerald-900/40 bg-[#0d140e] hover:border-emerald-600 flex flex-col justify-between space-y-2.5 transition"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white">{c.role}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
+                        CUSTOMER
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-gray-300 mt-0.5">{c.contact} • <span className="font-mono text-[10px] text-gray-400">{c.email}</span></div>
+                    <div className="text-[10px] text-gray-400 mt-1">{c.desc}</div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-emerald-950">
+                    <button
+                      type="button"
+                      disabled={actionLoadingEmail === c.email}
+                      onClick={() => handleDirectCustomerLogin(c.email)}
+                      className="flex-1 py-1.5 px-2 rounded bg-emerald-500 text-black text-[11px] font-bold hover:bg-emerald-400 transition disabled:opacity-50"
+                    >
+                      {actionLoadingEmail === c.email ? 'Logging in...' : '1-Click Customer Login'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('customer_login');
+                        setCustomerEmail(c.email);
+                        setCustomerPassword('password123');
+                      }}
+                      className="py-1.5 px-2 rounded border border-[#333] text-gray-300 text-[10px] hover:bg-[#1a1a1a] transition"
+                    >
+                      Fill Form
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section B: Internal Enterprise Staff */}
+          <div className="space-y-2 pt-3 border-t border-[#1c1c1c]">
             <div className="text-[11px] font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
               Enterprise Staff Accounts (Workspace)
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -493,7 +624,7 @@ export default function LoginPage() {
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-white">{p.role}</span>
+                      <span className="text-xs font-bold text-white">{p.role}</span>
                       <span className="text-[9px] px-1.5 py-0.5 rounded font-mono bg-blue-950 text-blue-300 border border-blue-800">
                         STAFF
                       </span>
@@ -507,67 +638,18 @@ export default function LoginPage() {
                       type="button"
                       disabled={actionLoadingEmail === p.email}
                       onClick={() => handleDirectStaffLogin(p.email)}
-                      className="flex-1 py-1 px-2 rounded bg-white text-black text-[11px] font-semibold hover:bg-gray-200 transition disabled:opacity-50"
+                      className="flex-1 py-1.5 px-2 rounded bg-white text-black text-[11px] font-semibold hover:bg-gray-200 transition disabled:opacity-50"
                     >
                       {actionLoadingEmail === p.email ? 'Logging in...' : '1-Click Sign In'}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveTab('signin');
-                        setEmail(p.email);
-                        setPassword('password123');
+                        setActiveTab('staff_login');
+                        setStaffEmail(p.email);
+                        setStaffPassword('password123');
                       }}
-                      className="py-1 px-2 rounded border border-[#333] text-gray-300 text-[10px] hover:bg-[#1a1a1a] transition"
-                    >
-                      Fill Form
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Section B: External Customer Accounts */}
-          <div className="space-y-2 pt-3 border-t border-[#1c1c1c]">
-            <div className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Customer Accounts (Portal Negotiation Room)
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {CUSTOMER_PERSONAS.map((c) => (
-                <div
-                  key={c.email}
-                  className="p-3 rounded border border-[#222] bg-[#111] hover:border-[#3a3a3a] flex flex-col justify-between space-y-2.5 transition"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-white">{c.role}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
-                        PORTAL
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-gray-400 mt-0.5">{c.contact} • <span className="font-mono text-[10px] text-gray-500">{c.quoteId}</span></div>
-                    <div className="text-[10px] text-gray-500 mt-1">{c.desc}</div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1 border-t border-[#1c1c1c]">
-                    <button
-                      type="button"
-                      disabled={actionLoadingEmail === c.email}
-                      onClick={() => handleDirectCustomerEnter(c.email, c.quoteId)}
-                      className="flex-1 py-1 px-2 rounded bg-emerald-500 text-black text-[11px] font-semibold hover:bg-emerald-400 transition disabled:opacity-50"
-                    >
-                      {actionLoadingEmail === c.email ? 'Connecting...' : 'Enter Portal Room'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('customer');
-                        setCustomerEmail(c.email);
-                        setQuoteId(c.quoteId);
-                      }}
-                      className="py-1 px-2 rounded border border-[#333] text-gray-300 text-[10px] hover:bg-[#1a1a1a] transition"
+                      className="py-1.5 px-2 rounded border border-[#333] text-gray-300 text-[10px] hover:bg-[#1a1a1a] transition"
                     >
                       Fill Form
                     </button>
