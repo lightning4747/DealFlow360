@@ -59,6 +59,27 @@ async function runMigrations() {
         WHEN duplicate_object THEN null;
       END $$;
     `;
+    await sqlClient`
+      DO $$ BEGIN
+        CREATE TYPE sales.approval_level AS ENUM ('level_1', 'level_2', 'level_3');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `;
+    await sqlClient`
+      DO $$ BEGIN
+        CREATE TYPE sales.approval_status AS ENUM ('pending', 'approved', 'rejected');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `;
+    await sqlClient`
+      DO $$ BEGIN
+        CREATE TYPE sales.approval_decision AS ENUM ('pending', 'approved', 'rejected');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `;
 
     // Customer Tiers
     await sqlClient`
@@ -164,6 +185,18 @@ async function runMigrations() {
       );
     `;
 
+    // Discount Ceilings
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS sales.discount_ceilings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tier_id UUID NOT NULL REFERENCES sales.customer_tiers(id) ON DELETE CASCADE,
+        category sales.product_category NOT NULL,
+        max_discount_pct NUMERIC(5,2) NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT discount_ceilings_tier_cat_uq UNIQUE (tier_id, category)
+      );
+    `;
+
     // Quotes
     await sqlClient`
       CREATE TABLE IF NOT EXISTS sales.quotes (
@@ -173,11 +206,20 @@ async function runMigrations() {
         customer_id UUID NOT NULL REFERENCES sales.customers(id) ON DELETE RESTRICT,
         status sales.quote_status NOT NULL DEFAULT 'draft',
         blended_risk_score NUMERIC(5,4),
+        brs_score NUMERIC(5,2),
+        current_approval_step INTEGER DEFAULT 1,
         total_amount NUMERIC(14,2) NOT NULL DEFAULT 0.00,
         expires_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+    `;
+
+    // Ensure columns exist if table was already created
+    await sqlClient`
+      ALTER TABLE sales.quotes 
+      ADD COLUMN IF NOT EXISTS brs_score NUMERIC(5,2),
+      ADD COLUMN IF NOT EXISTS current_approval_step INTEGER DEFAULT 1;
     `;
 
     // Quote Lines
@@ -190,8 +232,45 @@ async function runMigrations() {
         quantity INTEGER NOT NULL CHECK (quantity > 0),
         unit_price NUMERIC(12,2) NOT NULL,
         discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0.00 CHECK (discount_pct BETWEEN 0 AND 100),
+        applied_ceiling_pct NUMERIC(5,2),
+        violation_score NUMERIC(8,4) DEFAULT 0.0000,
         line_total NUMERIC(14,2) NOT NULL,
         line_type sales.line_type NOT NULL DEFAULT 'one_time'
+      );
+    `;
+
+    // Ensure columns exist on quote_lines if table already created
+    await sqlClient`
+      ALTER TABLE sales.quote_lines
+      ADD COLUMN IF NOT EXISTS applied_ceiling_pct NUMERIC(5,2),
+      ADD COLUMN IF NOT EXISTS violation_score NUMERIC(8,4) DEFAULT 0.0000;
+    `;
+
+    // Approvals
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS sales.approvals (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_id UUID NOT NULL REFERENCES sales.quotes(id) ON DELETE CASCADE,
+        brs_score NUMERIC(5,2) NOT NULL DEFAULT 0.00,
+        approval_level sales.approval_level NOT NULL DEFAULT 'level_1',
+        status sales.approval_status NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `;
+
+    // Approval Steps
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS sales.approval_steps (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        approval_id UUID NOT NULL REFERENCES sales.approvals(id) ON DELETE CASCADE,
+        step_order INTEGER NOT NULL,
+        role_required sales.user_role NOT NULL,
+        assigned_user_id UUID REFERENCES sales.users(id) ON DELETE SET NULL,
+        decision sales.approval_decision NOT NULL DEFAULT 'pending',
+        decision_reason TEXT,
+        decided_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `;
 
@@ -209,6 +288,26 @@ async function runMigrations() {
         metadata JSONB,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+    `;
+
+    // Immutability Trigger on Audit Logs
+    await sqlClient`
+      CREATE OR REPLACE FUNCTION sales.prevent_audit_logs_mutation()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        RAISE EXCEPTION 'sales.audit_logs is an immutable append-only table. Mutation (UPDATE/DELETE) is disallowed.';
+      END;
+      $$ LANGUAGE plpgsql;
+    `;
+
+    await sqlClient`
+      DROP TRIGGER IF EXISTS trg_immutable_audit_logs ON sales.audit_logs;
+    `;
+    await sqlClient`
+      CREATE TRIGGER trg_immutable_audit_logs
+      BEFORE UPDATE OR DELETE ON sales.audit_logs
+      FOR EACH ROW
+      EXECUTE FUNCTION sales.prevent_audit_logs_mutation();
     `;
 
     // Portal Magic Links

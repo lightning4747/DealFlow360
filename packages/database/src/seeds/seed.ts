@@ -1,5 +1,5 @@
 import { db, sqlClient } from '../client';
-import { users, customerTiers, products, priceLists, priceListItems, customers } from '../schema/sales.schema';
+import { users, customerTiers, products, priceLists, priceListItems, customers, discountCeilings } from '../schema/sales.schema';
 import * as bcrypt from 'bcryptjs';
 
 async function seed() {
@@ -385,7 +385,40 @@ async function seed() {
           set: { name: c.name, company: c.company, tier: c.tier, creditLimit: c.creditLimit },
         });
     }
-    console.log(`✅ ${customerData.length} customers seeded.`);
+    // 6. Seed Discount Ceilings (Phase 2 Governance)
+    console.log('Seeding discount ceilings...');
+    const ceilingData = [
+      // Standard / Bronze
+      { tierId: insertedTiers['STD'], category: 'hardware' as const, maxDiscountPct: '10.00' },
+      { tierId: insertedTiers['STD'], category: 'subscription' as const, maxDiscountPct: '15.00' },
+      { tierId: insertedTiers['STD'], category: 'services' as const, maxDiscountPct: '5.00' },
+
+      // Silver
+      { tierId: insertedTiers['SLV'], category: 'hardware' as const, maxDiscountPct: '15.00' },
+      { tierId: insertedTiers['SLV'], category: 'subscription' as const, maxDiscountPct: '20.00' },
+      { tierId: insertedTiers['SLV'], category: 'services' as const, maxDiscountPct: '10.00' },
+
+      // Gold
+      { tierId: insertedTiers['GLD'], category: 'hardware' as const, maxDiscountPct: '20.00' },
+      { tierId: insertedTiers['GLD'], category: 'subscription' as const, maxDiscountPct: '30.00' },
+      { tierId: insertedTiers['GLD'], category: 'services' as const, maxDiscountPct: '15.00' },
+
+      // Platinum
+      { tierId: insertedTiers['PLT'], category: 'hardware' as const, maxDiscountPct: '25.00' },
+      { tierId: insertedTiers['PLT'], category: 'subscription' as const, maxDiscountPct: '40.00' },
+      { tierId: insertedTiers['PLT'], category: 'services' as const, maxDiscountPct: '20.00' },
+    ];
+
+    for (const c of ceilingData) {
+      await db
+        .insert(discountCeilings)
+        .values(c)
+        .onConflictDoUpdate({
+          target: [discountCeilings.tierId, discountCeilings.category],
+          set: { maxDiscountPct: c.maxDiscountPct },
+        });
+    }
+    console.log(`✅ ${ceilingData.length} discount ceilings seeded.`);
 
     console.log('🎉 Database seed completed successfully!');
   } catch (err) {
