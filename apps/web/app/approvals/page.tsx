@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -15,7 +16,9 @@ import {
   UserCheck,
   Shield,
   FileText,
+  Package,
 } from 'lucide-react';
+import { AccountSwitcher } from '../../components/account-switcher';
 
 interface ApprovalItem {
   id: string;
@@ -102,12 +105,24 @@ export default function ApprovalsPage() {
     if (token) return token;
 
     try {
-      // Auto-authenticate default manager session for demo convenience
+      let loginEmail = 'manager@dealflow360.com';
+      if (typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem('currentUser');
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed.email && parsed.email !== 'guest@dealflow360.com') {
+              loginEmail = parsed.email;
+            }
+          } catch {}
+        }
+      }
+
       const res = await fetch(`${apiUrl}/internal/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: 'manager@dealflow360.com',
+          email: loginEmail,
           password: 'password123',
         }),
       });
@@ -348,13 +363,23 @@ export default function ApprovalsPage() {
           </div>
         </div>
 
-        {/* Action / Refresh */}
-        <button
-          onClick={fetchApprovals}
-          className="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-sm font-medium transition"
-        >
-          Refresh Queue
-        </button>
+        {/* Actions / User & Refresh */}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/products"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
+          >
+            <Package className="w-3.5 h-3.5 text-blue-400" />
+            <span>Admin Catalog</span>
+          </Link>
+          <button
+            onClick={fetchApprovals}
+            className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
+          >
+            Refresh Queue
+          </button>
+          <AccountSwitcher />
+        </div>
       </div>
 
       {/* Main Tabs */}

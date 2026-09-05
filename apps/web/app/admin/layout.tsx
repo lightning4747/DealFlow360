@@ -13,6 +13,7 @@ import {
   Database,
   ExternalLink,
 } from 'lucide-react';
+import { AccountSwitcher } from '../../components/account-switcher';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -21,6 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Products Catalog', href: '/admin/products', icon: Package },
     { name: 'Customer Tiers', href: '/admin/tiers', icon: Layers },
     { name: 'Price Lists', href: '/admin/price-lists', icon: FileSpreadsheet },
+    { name: 'Governance Approvals', href: '/approvals', icon: ShieldCheck },
   ];
 
   return (
@@ -108,10 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </span>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-              <ShieldCheck className="h-3.5 w-3.5 text-blue-400" />
-              <span>admin@dealflow360.com</span>
-            </span>
+            <AccountSwitcher />
           </div>
         </header>
 
