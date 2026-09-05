@@ -657,6 +657,69 @@ async function runMigrations() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `;
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS analytics.rep_discount_tracking (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        time TIMESTAMPTZ NOT NULL DEFAULT now(),
+        rep_id UUID NOT NULL,
+        quote_id UUID NOT NULL,
+        category VARCHAR(50) NOT NULL,
+        applied_discount_pct NUMERIC(5,2) NOT NULL,
+        tier_ceiling_pct NUMERIC(5,2) NOT NULL
+      );
+    `;
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS analytics.deal_health_metrics (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        time TIMESTAMPTZ NOT NULL DEFAULT now(),
+        quote_id UUID NOT NULL,
+        status VARCHAR(50) NOT NULL,
+        days_since_update NUMERIC(6,2) NOT NULL,
+        blended_risk_score NUMERIC(5,4)
+      );
+    `;
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS analytics.inventory_snapshots (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        time TIMESTAMPTZ NOT NULL DEFAULT now(),
+        warehouse_id UUID NOT NULL,
+        product_id UUID NOT NULL,
+        available_qty NUMERIC(10,2) NOT NULL DEFAULT 0,
+        reserved_qty NUMERIC(10,2) NOT NULL DEFAULT 0
+      );
+    `;
+
+    // Continuous Aggregates (with standard view fallback if TimescaleDB extension is not installed)
+    try {
+      await sqlClient`
+        CREATE OR REPLACE VIEW analytics.rep_discount_stats_30d AS
+        SELECT
+          rep_id,
+          category,
+          DATE_TRUNC('day', time) AS day,
+          AVG(applied_discount_pct) AS avg_discount,
+          STDDEV(applied_discount_pct) AS stddev_discount,
+          MIN(applied_discount_pct) AS min_discount,
+          MAX(applied_discount_pct) AS max_discount,
+          COUNT(*) AS line_count
+        FROM analytics.rep_discount_tracking
+        GROUP BY rep_id, category, DATE_TRUNC('day', time);
+      `;
+      await sqlClient`
+        CREATE OR REPLACE VIEW analytics.quote_velocity_1h AS
+        SELECT
+          DATE_TRUNC('hour', created_at) AS bucket,
+          COUNT(*) FILTER (WHERE event_type = 'quote.submitted') AS submitted,
+          COUNT(*) FILTER (WHERE event_type = 'quote.approved') AS approved,
+          COUNT(*) FILTER (WHERE event_type = 'quote.confirmed') AS confirmed,
+          COUNT(*) FILTER (WHERE event_type = 'quote.rejected') AS rejected
+        FROM analytics.quote_events
+        GROUP BY DATE_TRUNC('hour', created_at);
+      `;
+    } catch (err: any) {
+      console.warn('⚠️ Analytics views creation note:', err.message);
+    }
+
 
     console.log('✅ All PostgreSQL database tables migrated successfully.');
   } catch (err) {
