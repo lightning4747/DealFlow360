@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -18,14 +18,27 @@ import { AccountSwitcher } from '../../components/account-switcher';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [userRole, setUserRole] = useState<string>('admin');
 
-  const navigation = [
-    { name: 'Products Catalog', href: '/admin/products', icon: Package },
-    { name: 'Customer Tiers', href: '/admin/tiers', icon: Layers },
-    { name: 'Price Lists', href: '/admin/price-lists', icon: FileSpreadsheet },
-    { name: 'Governance Approvals', href: '/approvals', icon: ShieldCheck },
-    { name: 'Customer Portal (Acme)', href: '/customer/orders', icon: Building2 },
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.role) setUserRole(parsed.role);
+      }
+    } catch {}
+  }, []);
+
+  const allNav = [
+    { name: 'Products Catalog', href: '/admin/products', icon: Package, roles: ['admin', 'sales_rep', 'sales_manager', 'finance'] },
+    { name: 'Customer Tiers', href: '/admin/tiers', icon: Layers, roles: ['admin', 'sales_manager', 'finance'] },
+    { name: 'Price Lists', href: '/admin/price-lists', icon: FileSpreadsheet, roles: ['admin', 'finance'] },
+    { name: 'Governance Approvals', href: '/approvals', icon: ShieldCheck, roles: ['admin', 'sales_manager', 'finance', 'sales_rep'] },
+    { name: 'Customer Portal (Acme)', href: '/customer/orders', icon: Building2, roles: ['admin', 'customer'] },
   ];
+
+  const navigation = allNav.filter((item) => item.roles.includes(userRole));
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">

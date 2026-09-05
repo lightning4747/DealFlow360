@@ -92,6 +92,17 @@ export default function ApprovalsPage() {
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
   const [details, setDetails] = useState<ApprovalDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [userRole, setUserRole] = useState<string>('sales_manager');
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.role) setUserRole(parsed.role);
+      }
+    } catch {}
+  }, []);
 
   // Decision Modal
   const [decisionType, setDecisionType] = useState<'approved' | 'rejected' | null>(null);
@@ -366,13 +377,15 @@ export default function ApprovalsPage() {
 
         {/* Actions / User & Refresh */}
         <div className="flex items-center gap-3">
-          <Link
-            href="/customer/orders"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
-          >
-            <Building2 className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Customer Portal</span>
-          </Link>
+          {userRole === 'admin' && (
+            <Link
+              href="/customer/orders"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
+            >
+              <Building2 className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Customer Portal</span>
+            </Link>
+          )}
           <Link
             href="/admin/products"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
@@ -633,22 +646,28 @@ export default function ApprovalsPage() {
                     ${parseFloat(details.quote.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setDecisionType('rejected')}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold transition"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    Reject Deal
-                  </button>
-                  <button
-                    onClick={() => setDecisionType('approved')}
-                    className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-md"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    Approve Deal
-                  </button>
-                </div>
+                {['admin', 'sales_manager', 'finance'].includes(userRole) ? (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setDecisionType('rejected')}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold transition"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Reject Deal
+                    </button>
+                    <button
+                      onClick={() => setDecisionType('approved')}
+                      className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-md"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Approve Deal
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-xs text-amber-400/90 font-medium px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                    Read-Only Audit Mode: Only authorized Sales Managers & Finance Approvers can decide deals.
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -25,6 +25,17 @@ export default function PriceListsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [userRole, setUserRole] = useState<string>('admin');
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.role) setUserRole(parsed.role);
+      }
+    } catch {}
+  }, []);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -100,13 +111,15 @@ export default function PriceListsPage() {
             Configure partner tier price books, contracted custom SKUs, and volume discount schedules.
           </p>
         </div>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-blue-600/20"
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Price List</span>
-        </button>
+        {['admin', 'finance'].includes(userRole) && (
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-blue-600/20"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Price List</span>
+          </button>
+        )}
       </div>
 
       {/* Main Grid: list selector + item overrides table */}

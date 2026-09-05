@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { User, LogOut, ChevronDown, Check, Shield, Briefcase, DollarSign, UserCheck, Building2 } from 'lucide-react';
 
 interface CurrentUser {
@@ -54,11 +55,21 @@ const PRESET_ACCOUNTS = [
 ];
 
 export function AccountSwitcher() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+  // Role to destination workspace mapping
+  const ROLE_WORKSPACE_MAP: Record<string, string> = {
+    admin: '/admin/products',
+    sales_rep: '/admin/products',
+    sales_manager: '/approvals',
+    finance: '/approvals',
+    customer: '/customer/orders',
+  };
 
   // Load active user from storage or initialize default
   useEffect(() => {
@@ -93,38 +104,35 @@ export function AccountSwitcher() {
         }),
       });
 
+      let targetUser = {
+        id: targetAccount.email,
+        name: targetAccount.name,
+        email: targetAccount.email,
+        role: targetAccount.role,
+      };
+
       if (res.ok) {
         const json = await res.json();
         const token = json.data?.tokens?.accessToken;
-        const user = json.data?.user || {
-          id: targetAccount.email,
-          name: targetAccount.name,
-          email: targetAccount.email,
-          role: targetAccount.role,
-        };
-
+        if (json.data?.user) {
+          targetUser = json.data.user;
+        }
         if (token) {
           localStorage.setItem('token', token);
         }
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        setCurrentUser(user);
-      } else {
-        // Dev fallback if direct login mock
-        const fallbackUser = {
-          id: targetAccount.email,
-          name: targetAccount.name,
-          email: targetAccount.email,
-          role: targetAccount.role,
-        };
-        localStorage.setItem('currentUser', JSON.stringify(fallbackUser));
-        setCurrentUser(fallbackUser);
       }
 
+      localStorage.setItem('currentUser', JSON.stringify(targetUser));
+      setCurrentUser(targetUser);
       setIsOpen(false);
-      // Reload page to reflect new permissions and active role across view
-      window.location.reload();
+
+      // Determine target destination based on persona
+      const destination = ROLE_WORKSPACE_MAP[targetAccount.role] || '/admin/products';
+      router.push(destination);
     } catch (err) {
       console.error('Account switch error:', err);
+      const destination = ROLE_WORKSPACE_MAP[targetAccount.role] || '/admin/products';
+      router.push(destination);
     } finally {
       setSwitching(false);
     }
@@ -134,7 +142,6 @@ export function AccountSwitcher() {
     try {
       localStorage.removeItem('token');
       localStorage.removeItem('currentUser');
-      // Set to unauthenticated / prompt default
       const defaultUser = {
         id: 'guest',
         name: 'Logged Out',
@@ -144,7 +151,7 @@ export function AccountSwitcher() {
       localStorage.setItem('currentUser', JSON.stringify(defaultUser));
       setCurrentUser(defaultUser);
       setIsOpen(false);
-      window.location.reload();
+      router.push('/admin/products');
     } catch (e) {
       console.error(e);
     }

@@ -21,6 +21,17 @@ export default function CustomerTiersPage() {
   const [newThreshold, setNewThreshold] = useState('');
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>('admin');
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.role) setUserRole(parsed.role);
+      }
+    } catch {}
+  }, []);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -134,13 +145,15 @@ export default function CustomerTiersPage() {
                     >
                       {tier.code}
                     </span>
-                    <button
-                      onClick={() => openEditModal(tier)}
-                      className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
-                      title="Edit Ceilings"
-                    >
-                      <Edit3 className="h-4 w-4" />
-                    </button>
+                    {userRole === 'admin' && (
+                      <button
+                        onClick={() => openEditModal(tier)}
+                        className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                        title="Edit Ceilings"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
                   <h3 className="text-xl font-bold text-white mt-3">{tier.name}</h3>

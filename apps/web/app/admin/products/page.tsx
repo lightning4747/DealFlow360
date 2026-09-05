@@ -24,6 +24,17 @@ export default function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>('admin');
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.role) setUserRole(parsed.role);
+      }
+    } catch {}
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -136,16 +147,20 @@ export default function ProductsPage() {
         <div>
           <h2 className="text-2xl font-bold text-white tracking-tight">Product Catalog</h2>
           <p className="text-sm text-slate-400 mt-1">
-            Manage enterprise SKUs, categories, base pricing, and unit margins.
+            {userRole === 'admin'
+              ? 'Manage enterprise SKUs, categories, base pricing, and unit margins.'
+              : 'Browse enterprise product catalog, active categories, and contracted list pricing.'}
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-blue-600/20"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add SKU</span>
-        </button>
+        {userRole === 'admin' && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-blue-600/20"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add SKU</span>
+          </button>
+        )}
       </div>
 
       {/* Control bar: search + filters */}
@@ -193,10 +208,10 @@ export default function ProductsPage() {
               <th className="py-3 px-4">SKU & Product Name</th>
               <th className="py-3 px-4">Category</th>
               <th className="py-3 px-4 text-right">Base Price</th>
-              <th className="py-3 px-4 text-right">Unit Cost</th>
-              <th className="py-3 px-4 text-right">Unit Margin</th>
+              {userRole === 'admin' && <th className="py-3 px-4 text-right">Unit Cost</th>}
+              {userRole === 'admin' && <th className="py-3 px-4 text-right">Unit Margin</th>}
               <th className="py-3 px-4 text-center">Status</th>
-              <th className="py-3 px-4 text-right">Actions</th>
+              {userRole === 'admin' && <th className="py-3 px-4 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
@@ -241,17 +256,22 @@ export default function ProductsPage() {
                     <td className="py-3.5 px-4 text-right font-semibold text-white">
                       ${product.basePrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-3.5 px-4 text-right text-slate-400">
-                      ${product.unitCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <span className="text-emerald-400 font-medium">${margin.toFixed(2)}</span>
-                      <span className="text-xs text-slate-500 ml-1">({marginPct}%)</span>
-                    </td>
+                    {userRole === 'admin' && (
+                      <td className="py-3.5 px-4 text-right text-slate-400">
+                        ${product.unitCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                    )}
+                    {userRole === 'admin' && (
+                      <td className="py-3.5 px-4 text-right">
+                        <span className="text-emerald-400 font-medium">${margin.toFixed(2)}</span>
+                        <span className="text-xs text-slate-500 ml-1">({marginPct}%)</span>
+                      </td>
+                    )}
                     <td className="py-3.5 px-4 text-center">
                       <button
+                        disabled={userRole !== 'admin'}
                         onClick={() => toggleProductStatus(product)}
-                        className="inline-flex items-center space-x-1 transition-opacity hover:opacity-80"
+                        className={`inline-flex items-center space-x-1 ${userRole === 'admin' ? 'transition-opacity hover:opacity-80' : 'cursor-default'}`}
                       >
                         {product.isActive ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -264,14 +284,16 @@ export default function ProductsPage() {
                         )}
                       </button>
                     </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => toggleProductStatus(product)}
-                        className="text-xs text-slate-400 hover:text-white underline"
-                      >
-                        {product.isActive ? 'Deactivate' : 'Reactivate'}
-                      </button>
-                    </td>
+                    {userRole === 'admin' && (
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={() => toggleProductStatus(product)}
+                          className="text-xs text-slate-400 hover:text-white underline"
+                        >
+                          {product.isActive ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })

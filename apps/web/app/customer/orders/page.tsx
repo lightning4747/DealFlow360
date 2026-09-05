@@ -37,6 +37,17 @@ export default function CustomerOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [signingQuoteId, setSigningQuoteId] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>('customer');
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.role) setUserRole(parsed.role);
+      }
+    } catch {}
+  }, []);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -124,20 +135,24 @@ export default function CustomerOrdersPage() {
 
         {/* Links & Switcher */}
         <div className="flex items-center space-x-3">
-          <Link
-            href="/admin/products"
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition"
-          >
-            <Package className="h-3.5 w-3.5 text-blue-400" />
-            <span>Admin Catalog</span>
-          </Link>
-          <Link
-            href="/approvals"
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition"
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
-            <span>Governance Queue</span>
-          </Link>
+          {userRole === 'admin' && (
+            <>
+              <Link
+                href="/admin/products"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition"
+              >
+                <Package className="h-3.5 w-3.5 text-blue-400" />
+                <span>Admin Catalog</span>
+              </Link>
+              <Link
+                href="/approvals"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition"
+              >
+                <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
+                <span>Governance Queue</span>
+              </Link>
+            </>
+          )}
           <AccountSwitcher />
         </div>
       </header>
@@ -272,12 +287,10 @@ export default function CustomerOrdersPage() {
                           </button>
                         )}
                         {isPending && (
-                          <Link
-                            href="/approvals"
-                            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center space-x-1.5 transition"
-                          >
-                            <span>View Approval Status</span>
-                          </Link>
+                          <div className="px-4 py-2 rounded-xl bg-slate-900 text-amber-400 text-xs font-medium border border-amber-500/20 flex items-center space-x-1.5">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>In Governance Review</span>
+                          </div>
                         )}
                       </div>
                     </div>
