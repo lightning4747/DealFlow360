@@ -36,8 +36,8 @@ export class ApprovalRoutingService {
       throw new NotFoundException(`Quote with ID ${quoteId} not found`);
     }
 
-    if (quote.status !== 'draft' && quote.status !== 'under_negotiation' && quote.status !== 'sent') {
-      throw new BadRequestException(`Quote cannot be submitted in status '${quote.status}'. Only 'draft', 'under_negotiation', or 'sent' quotes can be submitted.`);
+    if (quote.status !== 'draft' && quote.status !== 'under_negotiation') {
+      throw new BadRequestException(`Quote cannot be submitted in status '${quote.status}'. Only draft or under_negotiation quotes can be submitted.`);
     }
 
     // 2. Fetch Customer & Tier

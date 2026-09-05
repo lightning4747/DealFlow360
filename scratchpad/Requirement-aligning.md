@@ -438,6 +438,17 @@ Correction
 • Recalculate and persist approval snapshots atomically.
 • Add concurrent approval and concurrent edit tests.
 
+### Remediation status — initial P0-8 safeguards
+
+Quote-line updates now:
+
+- require the quote to remain in `draft` or `under_negotiation`;
+- require the authenticated sales representative to own the quote;
+- reload catalog pricing rather than accepting a price override; and
+- reject edits to `pending_approval`, `sent`, `confirmed`, rejected, cancelled, or fulfilled quotes.
+
+Approval submission now accepts only `draft` and `under_negotiation` quotes, so an already-sent or governed quote cannot be submitted again through the command endpoint. Full immutable quote revisions, row locking, compare-and-set approval decisions, and concurrent workflow tests remain outstanding.
+
 Dependencies
 
 Requires quote lifecycle design and database version columns/constraints.

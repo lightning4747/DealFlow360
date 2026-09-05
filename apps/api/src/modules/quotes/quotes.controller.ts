@@ -64,9 +64,9 @@ export class QuotesController {
 
   @Patch('quotes/lines/:lineId')
   @Roles('sales_rep')
-  async updateLine(@Param('lineId') lineId: string, @Body() body: any) {
+  async updateLine(@Param('lineId') lineId: string, @Body() body: any, @Req() req: any) {
     const dto = UpdateQuoteLineSchema.parse(body);
-    const data = await this.quotesService.updateQuoteLine(lineId, dto);
+    const data = await this.quotesService.updateQuoteLine(lineId, dto, req.user);
     return { data, meta: null, error: null };
   }
 

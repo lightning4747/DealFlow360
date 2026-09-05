@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DRIZZLE_DB } from '../database/database.module';
 import { quotes, quoteLines, lineComments, products, customers, users } from '@dealflow360/database';
-import { eq, desc, inArray, or } from 'drizzle-orm';
+import { eq, desc, inArray, or, and } from 'drizzle-orm';
 import {
   CreateQuoteDto,
   CalculateQuoteDto,
@@ -194,10 +194,22 @@ export class QuotesService {
     };
   }
 
-  async updateQuoteLine(lineId: string, dto: UpdateQuoteLineDto) {
+  async updateQuoteLine(lineId: string, dto: UpdateQuoteLineDto, actor: { id?: string; sub?: string }) {
     const [existingLine] = await this.db.select().from(quoteLines).where(eq(quoteLines.id, lineId));
     if (!existingLine) {
       throw new NotFoundException(`Quote line ${lineId} not found`);
+    }
+
+    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, existingLine.quoteId));
+    if (!quote) {
+      throw new NotFoundException(`Quote ${existingLine.quoteId} not found`);
+    }
+    if (quote.status !== 'draft' && quote.status !== 'under_negotiation') {
+      throw new BadRequestException(`Quote cannot be edited in status '${quote.status}'`);
+    }
+    const actorId = actor.id || actor.sub;
+    if (quote.repId !== actorId) {
+      throw new BadRequestException('Only the quote owner can edit quote lines');
     }
 
     const newQty = dto.quantity !== undefined ? dto.quantity : existingLine.quantity;
@@ -225,7 +237,10 @@ export class QuotesService {
         lineTotal: lineTotal.toFixed(2),
         grossMargin: grossMargin.toFixed(2),
       })
-      .where(eq(quoteLines.id, lineId))
+      .where(and(
+        eq(quoteLines.id, lineId),
+        eq(quoteLines.quoteId, existingLine.quoteId),
+      ))
       .returning();
 
     // Recompute parent quote
