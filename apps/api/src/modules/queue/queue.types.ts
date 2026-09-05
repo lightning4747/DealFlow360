@@ -20,3 +20,14 @@ export interface ApprovalRoutingJobPayload {
   approvalLevel: 'level_1' | 'level_2' | 'level_3';
   escalationDeadlineHours?: number;
 }
+
+export interface FulfillmentSplitJobPayload {
+  quoteId: string;
+  customerId?: string | null;
+  destinationLatitude?: number | null;
+  destinationLongitude?: number | null;
+  items: {
+    productId: string;
+    quantity: number;
+  }[];
+}
