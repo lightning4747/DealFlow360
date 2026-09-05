@@ -559,6 +559,11 @@ async function runMigrations() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `;
+    await sqlClient`
+      CREATE UNIQUE INDEX IF NOT EXISTS payments_gateway_transaction_uq
+      ON billing.payments (gateway_transaction_id)
+      WHERE gateway_transaction_id IS NOT NULL;
+    `;
 
     // Ensure delivery coordinates exist on customers
     await sqlClient`

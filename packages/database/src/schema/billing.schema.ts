@@ -236,6 +236,7 @@ export const payments = billingSchema.table(
   (table) => ({
     invoiceIdx: index('payments_invoice_idx').on(table.invoiceId),
     customerIdx: index('payments_customer_idx').on(table.customerId),
+    gatewayTransactionIdx: uniqueIndex('payments_gateway_transaction_uq').on(table.gatewayTransactionId),
   }),
 );
 

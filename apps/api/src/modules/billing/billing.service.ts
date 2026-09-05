@@ -716,6 +716,29 @@ export class BillingService {
         throw new NotFoundException(`Invoice ${params.invoiceId} not found`);
       }
 
+      if (params.referenceTransactionId) {
+        const [existingPayment] = await tx
+          .select()
+          .from(payments)
+          .where(eq(payments.gatewayTransactionId, params.referenceTransactionId))
+          .limit(1);
+        if (existingPayment) {
+          return { paymentId: existingPayment.id, status: existingPayment.status };
+        }
+      }
+
+      if (invoice.status === 'paid') {
+        const [existingPayment] = await tx
+          .select()
+          .from(payments)
+          .where(eq(payments.invoiceId, params.invoiceId))
+          .limit(1);
+        if (existingPayment) {
+          return { paymentId: existingPayment.id, status: existingPayment.status };
+        }
+        throw new UnprocessableEntityException(`Invoice ${params.invoiceId} is already paid`);
+      }
+
       const paymentId = crypto.randomUUID();
       await tx.insert(payments).values({
         id: paymentId,
@@ -744,4 +767,3 @@ export class BillingService {
     });
   }
 }
-

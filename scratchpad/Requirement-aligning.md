@@ -771,7 +771,9 @@ Files:
 
 Actual behavior
 
-Payments have an optional  gatewayTransactionId  without a unique constraint. Webhook processing records payment based on event delivery without a durable event/idempotency record.
+Payments now reject duplicate gateway transaction IDs through a database unique index and `recordPayment` returns the original successful payment for repeated transaction callbacks. Already-paid invoices are also treated idempotently when a payment record exists.
+
+Webhook event IDs still have no durable receipt table, and the payment controller still needs request authentication, invoice ownership/amount validation, and explicit reconciliation for failed settlement writes.
 
 Impact
 
@@ -779,7 +781,7 @@ Retries or duplicate webhook deliveries can create duplicate payments or repeate
 
 Correction
 
-Add unique gateway event/transaction identifiers, webhook receipt records, atomic “already processed” checks, and invoice/payment reconciliation rules.
+Completed the gateway transaction uniqueness and atomic duplicate-payment checks. Add durable webhook receipt records, authenticate and scope payment requests, validate invoice amount/currency/status before gateway invocation, and surface settlement failures without silently swallowing them.
 
 ────────────────────
 
