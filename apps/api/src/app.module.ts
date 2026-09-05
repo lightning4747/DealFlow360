@@ -5,12 +5,16 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ProductsModule } from './modules/products/products.module';
 import { CustomerTiersModule } from './modules/customer-tiers/customer-tiers.module';
 import { PriceListsModule } from './modules/price-lists/price-lists.module';
+import { EventsModule } from './modules/events/events.module';
+import { GovernanceModule } from './modules/governance/governance.module';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '../../.env' }),
     DatabaseModule,
+    EventsModule,
+    GovernanceModule,
     AuthModule,
     ProductsModule,
     CustomerTiersModule,
