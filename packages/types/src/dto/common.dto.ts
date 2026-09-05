@@ -3,11 +3,14 @@ import { z } from 'zod';
 export const UserRoleEnum = z.enum(['admin', 'sales_rep', 'sales_manager', 'finance', 'customer']);
 export type UserRole = z.infer<typeof UserRoleEnum>;
 
-export const CustomerTierEnum = z.enum(['bronze', 'silver', 'gold']);
+export const CustomerTierEnum = z.enum(['bronze', 'silver', 'gold', 'platinum']);
 export type CustomerTier = z.infer<typeof CustomerTierEnum>;
 
 export const ProductCategoryEnum = z.enum(['hardware', 'services', 'subscription']);
 export type ProductCategory = z.infer<typeof ProductCategoryEnum>;
+
+export const LineTypeEnum = z.enum(['one_time', 'recurring']);
+export type LineType = z.infer<typeof LineTypeEnum>;
 
 export const ApiResponseEnvelopeSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
   z.object({
