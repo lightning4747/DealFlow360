@@ -2,22 +2,44 @@ _format_version: "3.0"
 _transform: true
 
 services:
-  - name: dealflow-api-service
+  - name: dealflow360-api
     url: http://host.docker.internal:3000
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+    retries: 5
     routes:
-      - name: internal-api-route
+      # Auth module passthrough
+      - name: auth-route
         paths:
-          - /api/v1/internal
+          - /api/v1/internal/auth
+          - /api/v1/portal/auth
         strip_path: false
+        preserve_host: true
         plugins:
           - name: rate-limiting
             config:
-              minute: 500
+              minute: 60
+              policy: local
+
+      # Internal sales workspace endpoints (Strict JWT + Rate-limiting)
+      - name: internal-sales-route
+        paths:
+          - /api/v1/sales
+          - /api/v1/internal
+        strip_path: false
+        preserve_host: true
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
               policy: local
           - name: cors
             config:
               origins:
-                - "*"
+                - "http://localhost:3000"
+                - "https://app.dealflow360.com"
+                - "https://admin.dealflow360.com"
               methods:
                 - GET
                 - POST
@@ -28,21 +50,28 @@ services:
                 - Authorization
                 - Content-Type
                 - X-Correlation-ID
+                - X-Requested-With
+              exposed_headers:
+                - X-Correlation-ID
               credentials: true
+              max_age: 3600
 
-      - name: portal-api-route
+      # External customer portal endpoints (Portal Rate-limiting + Custom Headers)
+      - name: customer-portal-route
         paths:
           - /api/v1/portal
         strip_path: false
+        preserve_host: true
         plugins:
           - name: rate-limiting
             config:
-              minute: 100
+              minute: 30
               policy: local
           - name: cors
             config:
               origins:
-                - "*"
+                - "http://localhost:3001"
+                - "https://portal.dealflow360.com"
               methods:
                 - GET
                 - POST
@@ -51,10 +80,24 @@ services:
                 - Authorization
                 - Content-Type
                 - X-Correlation-ID
+                - X-Portal-Token
+              exposed_headers:
+                - X-Correlation-ID
               credentials: true
+              max_age: 3600
 
 plugins:
+  # Correlation ID propagation plugin (UUID v4 header generation)
   - name: request-id
     config:
       header_name: X-Correlation-ID
       include_in_response: true
+
+  # Global security headers plugin
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - "X-Frame-Options: DENY"
+          - "X-Content-Type-Options: nosniff"
+          - "X-XSS-Protection: 1; mode=block"
