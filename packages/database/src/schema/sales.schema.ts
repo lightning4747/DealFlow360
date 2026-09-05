@@ -48,6 +48,24 @@ export const quoteStatusEnum = salesSchema.enum('quote_status', [
   'rejected',
 ]);
 
+export const approvalLevelEnum = salesSchema.enum('approval_level', [
+  'level_1',
+  'level_2',
+  'level_3',
+]);
+
+export const approvalStatusEnum = salesSchema.enum('approval_status', [
+  'pending',
+  'approved',
+  'rejected',
+]);
+
+export const approvalDecisionEnum = salesSchema.enum('approval_decision', [
+  'pending',
+  'approved',
+  'rejected',
+]);
+
 export const lineTypeEnum = salesSchema.enum('line_type', ['one_time', 'recurring']);
 
 // ─── users ───────────────────────────────────────────────────────────────────
@@ -223,6 +241,27 @@ export const discountTiers = salesSchema.table(
 export type DiscountTier = typeof discountTiers.$inferSelect;
 export type NewDiscountTier = typeof discountTiers.$inferInsert;
 
+// ─── discount_ceilings ───────────────────────────────────────────────────────
+export const discountCeilings = salesSchema.table(
+  'discount_ceilings',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tierId: uuid('tier_id').notNull().references(() => customerTiers.id, { onDelete: 'cascade' }),
+    category: productCategoryEnum('category').notNull(),
+    maxDiscountPct: numeric('max_discount_pct', { precision: 5, scale: 2 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (table) => ({
+    tierCatUnique: uniqueIndex('discount_ceilings_tier_cat_uq').on(table.tierId, table.category),
+    tierIdx: index('discount_ceilings_tier_idx').on(table.tierId),
+  }),
+);
+
+export type DiscountCeiling = typeof discountCeilings.$inferSelect;
+export type NewDiscountCeiling = typeof discountCeilings.$inferInsert;
+export const insertDiscountCeilingSchema = createInsertSchema(discountCeilings);
+export const selectDiscountCeilingSchema = createSelectSchema(discountCeilings);
+
 // ─── quotes ──────────────────────────────────────────────────────────────────
 export const quotes = salesSchema.table(
   'quotes',
@@ -233,6 +272,8 @@ export const quotes = salesSchema.table(
     customerId: uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'restrict' }),
     status: quoteStatusEnum('status').notNull().default('draft'),
     blendedRiskScore: numeric('blended_risk_score', { precision: 5, scale: 4 }),
+    brsScore: numeric('brs_score', { precision: 5, scale: 2 }),
+    currentApprovalStep: integer('current_approval_step').default(1),
     totalAmount: numeric('total_amount', { precision: 14, scale: 2 }).notNull().default('0.00'),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
@@ -247,6 +288,8 @@ export const quotes = salesSchema.table(
 
 export type Quote = typeof quotes.$inferSelect;
 export type NewQuote = typeof quotes.$inferInsert;
+export const insertQuoteSchema = createInsertSchema(quotes);
+export const selectQuoteSchema = createSelectSchema(quotes);
 
 // ─── quote_lines ─────────────────────────────────────────────────────────────
 export const quoteLines = salesSchema.table(
@@ -259,6 +302,8 @@ export const quoteLines = salesSchema.table(
     quantity: integer('quantity').notNull(),
     unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).notNull(),
     discountPct: numeric('discount_pct', { precision: 5, scale: 2 }).notNull().default('0.00'),
+    appliedCeilingPct: numeric('applied_ceiling_pct', { precision: 5, scale: 2 }),
+    violationScore: numeric('violation_score', { precision: 8, scale: 4 }).default('0.0000'),
     lineTotal: numeric('line_total', { precision: 14, scale: 2 }).notNull(),
     lineType: lineTypeEnum('line_type').notNull().default('one_time'),
   },
@@ -270,6 +315,57 @@ export const quoteLines = salesSchema.table(
 
 export type QuoteLine = typeof quoteLines.$inferSelect;
 export type NewQuoteLine = typeof quoteLines.$inferInsert;
+export const insertQuoteLineSchema = createInsertSchema(quoteLines);
+export const selectQuoteLineSchema = createSelectSchema(quoteLines);
+
+// ─── approvals ───────────────────────────────────────────────────────────────
+export const approvals = salesSchema.table(
+  'approvals',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    quoteId: uuid('quote_id').notNull().references(() => quotes.id, { onDelete: 'cascade' }),
+    brsScore: numeric('brs_score', { precision: 5, scale: 2 }).notNull().default('0.00'),
+    approvalLevel: approvalLevelEnum('approval_level').notNull().default('level_1'),
+    status: approvalStatusEnum('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (table) => ({
+    quoteIdx: index('approvals_quote_idx').on(table.quoteId),
+    statusIdx: index('approvals_status_idx').on(table.status),
+  }),
+);
+
+export type Approval = typeof approvals.$inferSelect;
+export type NewApproval = typeof approvals.$inferInsert;
+export const insertApprovalSchema = createInsertSchema(approvals);
+export const selectApprovalSchema = createSelectSchema(approvals);
+
+// ─── approval_steps ──────────────────────────────────────────────────────────
+export const approvalSteps = salesSchema.table(
+  'approval_steps',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    approvalId: uuid('approval_id').notNull().references(() => approvals.id, { onDelete: 'cascade' }),
+    stepOrder: integer('step_order').notNull(),
+    roleRequired: userRoleEnum('role_required').notNull(),
+    assignedUserId: uuid('assigned_user_id').references(() => users.id, { onDelete: 'set null' }),
+    decision: approvalDecisionEnum('decision').notNull().default('pending'),
+    decisionReason: text('decision_reason'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (table) => ({
+    approvalIdx: index('approval_steps_approval_idx').on(table.approvalId),
+    roleIdx: index('approval_steps_role_idx').on(table.roleRequired),
+    decisionIdx: index('approval_steps_decision_idx').on(table.decision),
+  }),
+);
+
+export type ApprovalStep = typeof approvalSteps.$inferSelect;
+export type NewApprovalStep = typeof approvalSteps.$inferInsert;
+export const insertApprovalStepSchema = createInsertSchema(approvalSteps);
+export const selectApprovalStepSchema = createSelectSchema(approvalSteps);
 
 // ─── audit_logs ──────────────────────────────────────────────────────────────
 export const auditLogs = salesSchema.table(
@@ -294,3 +390,5 @@ export const auditLogs = salesSchema.table(
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type NewAuditLog = typeof auditLogs.$inferInsert;
+export const insertAuditLogSchema = createInsertSchema(auditLogs);
+export const selectAuditLogSchema = createSelectSchema(auditLogs);
