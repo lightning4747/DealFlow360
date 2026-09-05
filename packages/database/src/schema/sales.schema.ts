@@ -271,7 +271,7 @@ export const quotes = salesSchema.table(
     repId: uuid('rep_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
     customerId: uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'restrict' }),
     status: quoteStatusEnum('status').notNull().default('draft'),
-    blendedRiskScore: numeric('blended_risk_score', { precision: 5, scale: 4 }),
+    blendedRiskScore: numeric('blended_risk_score', { precision: 8, scale: 4 }),
     brsScore: numeric('brs_score', { precision: 5, scale: 2 }),
     currentApprovalStep: integer('current_approval_step').default(1),
     totalAmount: numeric('total_amount', { precision: 14, scale: 2 }).notNull().default('0.00'),

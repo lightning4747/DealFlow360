@@ -5,7 +5,7 @@ import { Roles } from '../auth/decorators/auth.decorator';
 import { ApprovalRoutingService } from './approval-routing.service';
 import { AuditLogService } from './audit-log.service';
 
-@Controller()
+@Controller('api/v1')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class GovernanceController {
   constructor(
@@ -14,21 +14,33 @@ export class GovernanceController {
   ) {}
 
   // 1. Submit Quote for Governance Check & Approval
-  @Post(['quotes/:id/submit', 'sales/quotes/:id/submit', 'internal/quotes/:id/submit'])
+  @Post([
+    'quotes/:id/submit',
+    'sales/quotes/:id/submit',
+    'internal/quotes/:id/submit',
+  ])
   @Roles('admin', 'sales_rep', 'sales_manager')
   async submitQuote(@Param('id') quoteId: string, @Req() req: any) {
     return this.approvalService.submitQuote(quoteId, req.user);
   }
 
   // 2. Approver Queue (Get pending approvals)
-  @Get(['approvals', 'sales/approvals', 'internal/approvals'])
+  @Get([
+    'approvals',
+    'sales/approvals',
+    'internal/approvals',
+  ])
   @Roles('sales_manager', 'finance', 'admin')
   async listApprovals(@Req() req: any) {
     return this.approvalService.listPendingApprovals(req.user);
   }
 
   // 3. Approval Details
-  @Get(['approvals/:id', 'sales/approvals/:id', 'internal/approvals/:id'])
+  @Get([
+    'approvals/:id',
+    'sales/approvals/:id',
+    'internal/approvals/:id',
+  ])
   @Roles('sales_manager', 'finance', 'admin')
   async getApprovalDetails(@Param('id') approvalId: string) {
     return this.approvalService.getApprovalDetails(approvalId);
@@ -67,7 +79,10 @@ export class GovernanceController {
   }
 
   // 6. Audit Trail for Quote or Entity
-  @Get('audit/:entityType/:entityId')
+  @Get([
+    'audit/:entityType/:entityId',
+    'sales/audit/:entityType/:entityId',
+  ])
   @Roles('sales_manager', 'finance', 'admin')
   async getAuditLogs(
     @Param('entityType') entityType: string,

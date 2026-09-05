@@ -26,7 +26,7 @@ export default function PriceListsPage() {
   const [newListName, setNewListName] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
   const fetchPriceLists = async () => {
     try {

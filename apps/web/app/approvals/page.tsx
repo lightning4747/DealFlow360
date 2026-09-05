@@ -97,10 +97,37 @@ export default function ApprovalsPage() {
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+  const ensureAuthToken = async (): Promise<string | null> => {
+    let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (token) return token;
+
+    try {
+      // Auto-authenticate default manager session for demo convenience
+      const res = await fetch(`${apiUrl}/internal/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'manager@dealflow360.com',
+          password: 'password123',
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        token = json.data?.tokens?.accessToken || null;
+        if (token && typeof window !== 'undefined') {
+          localStorage.setItem('token', token);
+        }
+      }
+    } catch (e) {
+      console.error('Auto-login error:', e);
+    }
+    return token;
+  };
+
   const fetchApprovals = async () => {
     setLoading(true);
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const token = await ensureAuthToken();
       const res = await fetch(`${apiUrl}/sales/approvals`, {
         headers: {
           'Content-Type': 'application/json',

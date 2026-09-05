@@ -21,6 +21,22 @@ services:
             config:
               minute: 60
               policy: local
+          - name: cors
+            config:
+              origins:
+                - "http://localhost:3000"
+                - "http://localhost:3001"
+                - "https://app.dealflow360.com"
+                - "https://admin.dealflow360.com"
+              methods:
+                - GET
+                - POST
+                - OPTIONS
+              headers:
+                - Authorization
+                - Content-Type
+                - X-Correlation-ID
+              credentials: true
 
       # Internal sales workspace endpoints (Strict JWT + Rate-limiting)
       - name: internal-sales-route
@@ -38,6 +54,7 @@ services:
             config:
               origins:
                 - "http://localhost:3000"
+                - "http://localhost:3001"
                 - "https://app.dealflow360.com"
                 - "https://admin.dealflow360.com"
               methods:

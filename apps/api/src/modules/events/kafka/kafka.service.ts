@@ -44,17 +44,19 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       await this.consumer.subscribe({ topics: ['quote.events', 'approval.events'], fromBeginning: false });
       this.logger.log('Kafka Consumer subscribed to quote.events and approval.events.');
 
-      await this.consumer.run({
+      // Run consumer loop asynchronously in background so NestJS HTTP starts immediately
+      this.consumer.run({
         eachMessage: async ({ topic, partition, message }) => {
           try {
             const eventType = message.headers?.eventType?.toString() || 'unknown';
             const payload = message.value ? JSON.parse(message.value.toString()) : null;
             this.logger.log(`Received event [${eventType}] on ${topic}[${partition}]`);
-            // Handlers can hook into events or forward to queues
           } catch (err: any) {
             this.logger.error(`Error processing Kafka message on ${topic}: ${err.message}`);
           }
         },
+      }).catch((err) => {
+        this.logger.warn(`Kafka consumer run notice: ${err.message}`);
       });
 
       this.isConnected = true;
