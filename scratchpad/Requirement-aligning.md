@@ -453,6 +453,12 @@ Dependencies
 
 Requires quote lifecycle design and database version columns/constraints.
 
+### Remediation status — approval concurrency safeguards
+
+Approval decisions now require the quote to be in `pending_approval`. Each decision transaction claims the active step with a `decision = pending` compare-and-set condition, updates the approval only while it remains pending, and updates the quote only while its status and active step still match the decision being made. A losing concurrent request fails instead of emitting a second successful transition.
+
+Immutable approval snapshots, explicit quote revision records, and dedicated concurrent integration tests remain outstanding.
+
 ────────────────────
 
 ## 3. P1 — Major functional and architectural defects

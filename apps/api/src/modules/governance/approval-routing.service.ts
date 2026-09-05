@@ -407,6 +407,9 @@ export class ApprovalRoutingService {
     if (!quote) {
       throw new NotFoundException(`Associated quote not found`);
     }
+    if (quote.status !== 'pending_approval') {
+      throw new BadRequestException(`Quote is not awaiting approval (status: '${quote.status}')`);
+    }
 
     const steps = await this.db
       .select()
@@ -436,7 +439,7 @@ export class ApprovalRoutingService {
 
       // Mark step rejected, approval rejected, and revert quote to draft or rejected
       await this.db.transaction(async (tx: any) => {
-        await tx
+        const [claimedStep] = await tx
           .update(approvalSteps)
           .set({
             decision: 'rejected',
@@ -444,23 +447,32 @@ export class ApprovalRoutingService {
             assignedUserId: actor.id,
             decidedAt: new Date(),
           })
-          .where(eq(approvalSteps.id, activeStep.id));
+          .where(and(eq(approvalSteps.id, activeStep.id), eq(approvalSteps.decision, 'pending')));
+        if (!claimedStep) {
+          throw new BadRequestException('Approval step has already been decided');
+        }
 
-        await tx
+        const [updatedApproval] = await tx
           .update(approvals)
           .set({
             status: 'rejected',
             updatedAt: new Date(),
           })
-          .where(eq(approvals.id, approvalId));
+          .where(and(eq(approvals.id, approvalId), eq(approvals.status, 'pending')));
+        if (!updatedApproval) {
+          throw new BadRequestException('Approval request has already been decided');
+        }
 
-        await tx
+        const [updatedQuote] = await tx
           .update(quotes)
           .set({
             status: 'rejected',
             updatedAt: new Date(),
           })
-          .where(eq(quotes.id, appr.quoteId));
+          .where(and(eq(quotes.id, appr.quoteId), eq(quotes.status, 'pending_approval')));
+        if (!updatedQuote) {
+          throw new BadRequestException('Quote approval state changed concurrently');
+        }
 
         await this.auditLogService.log(
           {
@@ -514,7 +526,7 @@ export class ApprovalRoutingService {
     if (isLastStep) {
       // All steps cleared! Final approval
       await this.db.transaction(async (tx: any) => {
-        await tx
+        const [claimedStep] = await tx
           .update(approvalSteps)
           .set({
             decision: 'approved',
@@ -522,23 +534,32 @@ export class ApprovalRoutingService {
             assignedUserId: actor.id,
             decidedAt: new Date(),
           })
-          .where(eq(approvalSteps.id, activeStep.id));
+          .where(and(eq(approvalSteps.id, activeStep.id), eq(approvalSteps.decision, 'pending')));
+        if (!claimedStep) {
+          throw new BadRequestException('Approval step has already been decided');
+        }
 
-        await tx
+        const [updatedApproval] = await tx
           .update(approvals)
           .set({
             status: 'approved',
             updatedAt: new Date(),
           })
-          .where(eq(approvals.id, approvalId));
+          .where(and(eq(approvals.id, approvalId), eq(approvals.status, 'pending')));
+        if (!updatedApproval) {
+          throw new BadRequestException('Approval request has already been decided');
+        }
 
-        await tx
+        const [updatedQuote] = await tx
           .update(quotes)
           .set({
             status: 'sent',
             updatedAt: new Date(),
           })
-          .where(eq(quotes.id, appr.quoteId));
+          .where(and(eq(quotes.id, appr.quoteId), eq(quotes.status, 'pending_approval'), eq(quotes.currentApprovalStep, activeStep.stepOrder)));
+        if (!updatedQuote) {
+          throw new BadRequestException('Quote approval state changed concurrently');
+        }
 
         await this.auditLogService.log(
           {
@@ -585,7 +606,7 @@ export class ApprovalRoutingService {
       const nextStep = steps.find((s: any) => s.stepOrder === nextStepOrder);
 
       await this.db.transaction(async (tx: any) => {
-        await tx
+        const [claimedStep] = await tx
           .update(approvalSteps)
           .set({
             decision: 'approved',
@@ -593,15 +614,21 @@ export class ApprovalRoutingService {
             assignedUserId: actor.id,
             decidedAt: new Date(),
           })
-          .where(eq(approvalSteps.id, activeStep.id));
+          .where(and(eq(approvalSteps.id, activeStep.id), eq(approvalSteps.decision, 'pending')));
+        if (!claimedStep) {
+          throw new BadRequestException('Approval step has already been decided');
+        }
 
-        await tx
+        const [updatedQuote] = await tx
           .update(quotes)
           .set({
             currentApprovalStep: nextStepOrder,
             updatedAt: new Date(),
           })
-          .where(eq(quotes.id, appr.quoteId));
+          .where(and(eq(quotes.id, appr.quoteId), eq(quotes.status, 'pending_approval'), eq(quotes.currentApprovalStep, activeStep.stepOrder)));
+        if (!updatedQuote) {
+          throw new BadRequestException('Quote approval state changed concurrently');
+        }
 
         await this.auditLogService.log(
           {
