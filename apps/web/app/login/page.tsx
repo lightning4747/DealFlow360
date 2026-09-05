@@ -9,59 +9,60 @@ const DEMO_PERSONAS = [
     role: 'Sales Representative',
     email: 'rep1@dealflow360.com',
     desc: 'Builds quotes, configures items, requests discounts',
+    type: 'internal' as const,
   },
   {
     role: 'Sales Manager',
     email: 'manager@dealflow360.com',
     desc: 'Reviews deals, approves tier-1/tier-2 threshold discounts',
+    type: 'internal' as const,
   },
   {
     role: 'Finance & Ops',
     email: 'finance@dealflow360.com',
     desc: 'Approves high-risk escalations, reviews invoice schedules',
+    type: 'internal' as const,
   },
   {
     role: 'Administrator',
     email: 'admin@dealflow360.com',
     desc: 'Manages product catalog, pricing rules, customer tiers',
+    type: 'internal' as const,
   },
-];
-
-const DEMO_CUSTOMER_ACCOUNTS = [
   {
-    name: 'Sarah Connor',
+    role: 'Customer — Acme Corp (Gold Tier)',
     email: 'procurement@acme.com',
-    company: 'Acme Corporation',
-    tier: 'Gold',
-    defaultQuoteId: 'Q-1042',
+    desc: 'Sarah Connor (Quote: Q-1042)',
+    type: 'customer' as const,
+    quoteId: 'Q-1042',
   },
   {
-    name: 'Hank Scorpio',
+    role: 'Customer — Globex Corp (Gold Tier)',
     email: 'purchasing@globex.com',
-    company: 'Globex Corporation',
-    tier: 'Gold',
-    defaultQuoteId: 'Q-1043',
+    desc: 'Hank Scorpio (Quote: Q-1043)',
+    type: 'customer' as const,
+    quoteId: 'Q-1043',
   },
   {
-    name: 'Peter Gibbons',
+    role: 'Customer — Initech LLC (Silver Tier)',
     email: 'billing@initech.com',
-    company: 'Initech LLC',
-    tier: 'Silver',
-    defaultQuoteId: 'Q-1044',
+    desc: 'Peter Gibbons (Quote: Q-1044)',
+    type: 'customer' as const,
+    quoteId: 'Q-1044',
   },
   {
-    name: 'Elena Rostova',
+    role: 'Customer — Apex Logistics (Standard Tier)',
     email: 'ops@apexlogistics.com',
-    company: 'Apex Logistics Inc',
-    tier: 'Standard',
-    defaultQuoteId: 'Q-1045',
+    desc: 'Elena Rostova (Quote: Q-1045)',
+    type: 'customer' as const,
+    quoteId: 'Q-1045',
   },
   {
-    name: 'Marcus Vance',
+    role: 'Customer — Nexus Health (Platinum Tier)',
     email: 'it-purchasing@nexushealth.org',
-    company: 'Nexus Health Systems',
-    tier: 'Platinum',
-    defaultQuoteId: 'Q-1046',
+    desc: 'Marcus Vance (Quote: Q-1046)',
+    type: 'customer' as const,
+    quoteId: 'Q-1046',
   },
 ];
 
@@ -275,62 +276,44 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Global Quick-Select Container (Personas + Customer Accounts Dropdown) */}
-        <div className="p-6 bg-[#0c0c0c] border border-[#222] rounded-lg space-y-4">
-          <div className="space-y-2">
-            <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
-              Quick-Select Internal Persona (FR-03 RBAC)
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {DEMO_PERSONAS.map((p) => (
-                <button
-                  key={p.email}
-                  type="button"
-                  onClick={() => {
+        {/* Quick-Select Persona Container */}
+        <div className="p-6 bg-[#0c0c0c] border border-[#222] rounded-lg space-y-3">
+          <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
+            Quick-Select Demo Persona (Click to Switch)
+          </div>
+          <div className="grid grid-cols-1 gap-2 max-h-80 overflow-y-auto pr-1">
+            {DEMO_PERSONAS.map((p) => (
+              <button
+                key={p.email}
+                type="button"
+                onClick={() => {
+                  if (p.type === 'internal') {
                     setActiveTab('internal');
                     setEmail(p.email);
                     setPassword('password123');
-                  }}
-                  className={`text-left p-2.5 rounded border transition ${
-                    activeTab === 'internal' && email === p.email
-                      ? 'border-white bg-[#1a1a1a]'
-                      : 'border-[#222] bg-[#111] hover:border-[#444]'
-                  }`}
-                >
-                  <div className="text-xs font-semibold text-white">{p.role}</div>
-                  <div className="text-[11px] text-gray-400 font-mono">{p.email}</div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">{p.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Customer Accounts Dropdown Box at the Bottom */}
-          <div className="pt-3 border-t border-[#1f1f1f] space-y-1.5">
-            <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
-              Quick-Select Customer Account (Portal User)
-            </div>
-            <select
-              value={customerEmail}
-              onChange={(e) => {
-                const selected = DEMO_CUSTOMER_ACCOUNTS.find((c) => c.email === e.target.value);
-                if (selected) {
-                  setActiveTab('customer');
-                  setCustomerEmail(selected.email);
-                  if (selected.defaultQuoteId) {
-                    setQuoteId(selected.defaultQuoteId);
+                  } else {
+                    setActiveTab('customer');
+                    setCustomerEmail(p.email);
+                    setQuoteId(p.quoteId || 'Q-1042');
                   }
-                }
-              }}
-              className="w-full px-3 py-2.5 bg-[#111] border border-[#333] hover:border-[#555] rounded text-xs text-white focus:outline-none focus:border-white transition cursor-pointer"
-            >
-              <option value="">-- Select a Demo Customer Account --</option>
-              {DEMO_CUSTOMER_ACCOUNTS.map((c) => (
-                <option key={c.email} value={c.email}>
-                  {c.company} — {c.name} ({c.email}) [{c.tier} Tier]
-                </option>
-              ))}
-            </select>
+                }}
+                className={`text-left p-2.5 rounded border transition ${
+                  (activeTab === 'internal' && email === p.email) ||
+                  (activeTab === 'customer' && customerEmail === p.email)
+                    ? 'border-white bg-[#1a1a1a]'
+                    : 'border-[#222] bg-[#111] hover:border-[#444]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold text-white">{p.role}</div>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${p.type === 'internal' ? 'bg-blue-950 text-blue-300 border border-blue-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'}`}>
+                    {p.type === 'internal' ? 'STAFF' : 'CUSTOMER'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-gray-400 font-mono mt-0.5">{p.email}</div>
+                <div className="text-[10px] text-gray-400 mt-0.5">{p.desc}</div>
+              </button>
+            ))}
           </div>
         </div>
       </div>
