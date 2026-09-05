@@ -11,6 +11,7 @@ import { QuotesModule } from './modules/quotes/quotes.module';
 import { RecommendationsModule } from './modules/recommendations/recommendations.module';
 import { PortalModule } from './modules/portal/portal.module';
 import { FulfillmentModule } from './modules/fulfillment/fulfillment.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
 
 @Module({
@@ -23,6 +24,7 @@ import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
     RecommendationsModule,
     PortalModule,
     FulfillmentModule,
+    BillingModule,
     AuthModule,
     ProductsModule,
     CustomerTiersModule,

@@ -4,6 +4,7 @@ import { magicLinks, quotes, quoteLines, products, lineComments, negotiationSess
 import { eq, and, gt, desc } from 'drizzle-orm';
 import { CustomerCounterProposalDto } from '@dealflow360/types';
 import { ApprovalRoutingService } from '../governance/approval-routing.service';
+import { OrderBifurcationService } from '../billing/order-bifurcation.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class PortalService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: any,
     private readonly approvalRoutingService: ApprovalRoutingService,
+    private readonly orderBifurcationService: OrderBifurcationService,
   ) {}
 
   async getSanitizedQuoteByToken(token: string) {
@@ -176,20 +178,24 @@ export class PortalService {
     }
 
     // Otherwise within threshold or already approved -> quote is confirmed and ready for fulfillment
+    // Trigger atomic order confirmation bifurcation (generates one-time invoices and subscriptions)
+    const bifurcationResult = await this.orderBifurcationService.confirmQuote(quote.id, {
+      id: 'customer-portal',
+      role: 'customer',
+      name: participantName || 'Authorized Customer',
+    });
+
     const [confirmedQuote] = await this.db
-      .update(quotes)
-      .set({
-        status: 'confirmed',
-        updatedAt: new Date(),
-      })
-      .where(eq(quotes.id, quote.id))
-      .returning();
+      .select()
+      .from(quotes)
+      .where(eq(quotes.id, quote.id));
 
     return {
       success: true,
       status: 'confirmed',
       message: 'Quotation confirmed! Order is now approved and ready for warehouse fulfillment.',
       quote: confirmedQuote,
+      bifurcation: bifurcationResult,
     };
   }
 }
