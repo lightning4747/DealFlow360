@@ -31,3 +31,25 @@ export interface FulfillmentSplitJobPayload {
     quantity: number;
   }[];
 }
+
+export interface InvoiceGenerationJobPayload {
+  invoiceId: string;
+  quoteId?: string | null;
+  billingScheduleId?: string | null;
+  accountId?: string;
+  amount?: string;
+  currency?: string;
+}
+
+export interface BillingScheduleJobPayload {
+  subscriptionId: string;
+  scheduleDate: string;
+  amount: string;
+}
+
+export interface ProrationCalculationJobPayload {
+  subscriptionId: string;
+  targetQuantity: number;
+  effectiveDate: string;
+}
+

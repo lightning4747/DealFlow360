@@ -1,7 +1,14 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker, Job } from 'bullmq';
-import { ApprovalRoutingJobPayload, EmailNotificationJobPayload, FulfillmentSplitJobPayload } from './queue.types';
+import {
+  ApprovalRoutingJobPayload,
+  EmailNotificationJobPayload,
+  FulfillmentSplitJobPayload,
+  InvoiceGenerationJobPayload,
+  BillingScheduleJobPayload,
+  ProrationCalculationJobPayload,
+} from './queue.types';
 import { SpatialAllocationEngine } from '../fulfillment/spatial-allocation.engine';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
 import { KafkaService } from '../events/kafka/kafka.service';
@@ -12,9 +19,16 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   public approvalRoutingQueue: Queue<ApprovalRoutingJobPayload>;
   public emailNotificationQueue: Queue<EmailNotificationJobPayload>;
   public fulfillmentSplitQueue: Queue<FulfillmentSplitJobPayload>;
+  public invoiceGenerationQueue: Queue<InvoiceGenerationJobPayload>;
+  public billingScheduleQueue: Queue<BillingScheduleJobPayload>;
+  public prorationQueue: Queue<ProrationCalculationJobPayload>;
+
   private approvalWorker: Worker<ApprovalRoutingJobPayload>;
   private emailWorker: Worker<EmailNotificationJobPayload>;
   private fulfillmentWorker: Worker<FulfillmentSplitJobPayload>;
+  private invoiceGenerationWorker: Worker<InvoiceGenerationJobPayload>;
+  private billingScheduleWorker: Worker<BillingScheduleJobPayload>;
+  private prorationWorker: Worker<ProrationCalculationJobPayload>;
 
   constructor(
     private readonly configService: ConfigService,
@@ -30,10 +44,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       connection,
       defaultJobOptions: {
         attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 1000,
-        },
+        backoff: { type: 'exponential', delay: 1000 },
         removeOnComplete: { count: 500 },
         removeOnFail: false,
       },
@@ -43,10 +54,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       connection,
       defaultJobOptions: {
         attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000,
-        },
+        backoff: { type: 'exponential', delay: 2000 },
         removeOnComplete: { count: 500 },
         removeOnFail: false,
       },
@@ -56,10 +64,37 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       connection,
       defaultJobOptions: {
         attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 1000,
-        },
+        backoff: { type: 'exponential', delay: 1000 },
+        removeOnComplete: { count: 500 },
+        removeOnFail: false,
+      },
+    });
+
+    this.invoiceGenerationQueue = new Queue<InvoiceGenerationJobPayload>('invoice-generation', {
+      connection,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+        removeOnComplete: { count: 500 },
+        removeOnFail: false,
+      },
+    });
+
+    this.billingScheduleQueue = new Queue<BillingScheduleJobPayload>('billing-schedule-generation', {
+      connection,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+        removeOnComplete: { count: 500 },
+        removeOnFail: false,
+      },
+    });
+
+    this.prorationQueue = new Queue<ProrationCalculationJobPayload>('proration-calculation', {
+      connection,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
         removeOnComplete: { count: 500 },
         removeOnFail: false,
       },
@@ -84,10 +119,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         }
         return { processed: true, quoteId: job.data.quoteId };
       },
-      {
-        connection,
-        concurrency: 5,
-      },
+      { connection, concurrency: 5 },
     );
 
     this.emailWorker = new Worker<EmailNotificationJobPayload>(
@@ -110,7 +142,6 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         const splitResult = await this.spatialEngine.calculateFulfillmentSplit(job.data);
         await this.fulfillmentService.saveSplitPlan(splitResult);
 
-        // Publish event to Kafka
         await this.kafkaService.publishEvent(
           'fulfillment.events',
           'FULFILLMENT_SPLIT_CALCULATED',
@@ -118,15 +149,39 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
           {
             ...splitResult,
             timestamp: new Date().toISOString(),
-          }
+          },
         );
 
         return { processed: true, quoteId: job.data.quoteId, hubCount: splitResult.hubCount };
       },
-      {
-        connection,
-        concurrency: 5,
+      { connection, concurrency: 5 },
+    );
+
+    this.invoiceGenerationWorker = new Worker<InvoiceGenerationJobPayload>(
+      'invoice-generation',
+      async (job: Job<InvoiceGenerationJobPayload>) => {
+        this.logger.log(`Processing invoice-generation PDF job for invoice ${job.data.invoiceId}`);
+        return { generated: true, invoiceId: job.data.invoiceId };
       },
+      { connection, concurrency: 5 },
+    );
+
+    this.billingScheduleWorker = new Worker<BillingScheduleJobPayload>(
+      'billing-schedule-generation',
+      async (job: Job<BillingScheduleJobPayload>) => {
+        this.logger.log(`Processing billing schedule sweep for subscription ${job.data.subscriptionId}`);
+        return { processed: true, subscriptionId: job.data.subscriptionId };
+      },
+      { connection, concurrency: 5 },
+    );
+
+    this.prorationWorker = new Worker<ProrationCalculationJobPayload>(
+      'proration-calculation',
+      async (job: Job<ProrationCalculationJobPayload>) => {
+        this.logger.log(`Processing async proration for subscription ${job.data.subscriptionId}`);
+        return { processed: true, subscriptionId: job.data.subscriptionId };
+      },
+      { connection, concurrency: 5 },
     );
 
     this.approvalWorker.on('failed', (job, err) => {
@@ -150,9 +205,15 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     await this.approvalWorker.close();
     await this.emailWorker.close();
     await this.fulfillmentWorker.close();
+    await this.invoiceGenerationWorker.close();
+    await this.billingScheduleWorker.close();
+    await this.prorationWorker.close();
     await this.approvalRoutingQueue.close();
     await this.emailNotificationQueue.close();
     await this.fulfillmentSplitQueue.close();
+    await this.invoiceGenerationQueue.close();
+    await this.billingScheduleQueue.close();
+    await this.prorationQueue.close();
   }
 
   async enqueueApprovalRouting(payload: ApprovalRoutingJobPayload): Promise<void> {
@@ -170,6 +231,24 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   async enqueueFulfillmentSplit(payload: FulfillmentSplitJobPayload): Promise<void> {
     await this.fulfillmentSplitQueue.add('calculate-split', payload, {
       jobId: `fulfillment-split-${payload.quoteId}-${Date.now()}`,
+    });
+  }
+
+  async enqueueInvoiceGeneration(payload: InvoiceGenerationJobPayload): Promise<void> {
+    await this.invoiceGenerationQueue.add('generate-invoice', payload, {
+      jobId: `invoice-gen-${payload.invoiceId}-${Date.now()}`,
+    });
+  }
+
+  async enqueueBillingScheduleGeneration(payload: BillingScheduleJobPayload): Promise<void> {
+    await this.billingScheduleQueue.add('generate-schedule', payload, {
+      jobId: `billing-sched-${payload.subscriptionId}-${Date.now()}`,
+    });
+  }
+
+  async enqueueProration(payload: ProrationCalculationJobPayload): Promise<void> {
+    await this.prorationQueue.add('compute-proration', payload, {
+      jobId: `proration-${payload.subscriptionId}-${Date.now()}`,
     });
   }
 }
