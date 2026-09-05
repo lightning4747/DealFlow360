@@ -30,6 +30,8 @@ async function runMigrations() {
       EXCEPTION
         WHEN duplicate_object THEN null;
       END $$;
+    `;
+    await sqlClient`
       DO $$ BEGIN
         ALTER TYPE sales.user_role ADD VALUE IF NOT EXISTS 'customer';
       EXCEPTION
