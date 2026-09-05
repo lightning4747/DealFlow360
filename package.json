@@ -8,9 +8,10 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
-    "clean": "turbo run clean",
+    "test": "turbo run test",
     "db:generate": "pnpm --filter @dealflow360/database db:generate",
-    "db:migrate": "pnpm --filter @dealflow360/database db:migrate"
+    "db:migrate": "pnpm --filter @dealflow360/database db:migrate",
+    "db:seed": "pnpm --filter @dealflow360/database db:seed"
   },
   "devDependencies": {
     "turbo": "^1.13.0",
