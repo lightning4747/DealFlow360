@@ -1,14 +1,13 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
-import { warehouseStock, fulfillmentSplits, backorders } from '@dealflow360/database';
-import { eq, and, sql } from 'drizzle-orm';
+import { Injectable, Logger, BadRequestException, Inject } from '@nestjs/common';
+import { DRIZZLE_DB } from '../database/database.module';
+import { sql } from 'drizzle-orm';
 import { ReserveStockItemDto } from '@dealflow360/types';
 
 @Injectable()
 export class StockReservationService {
   private readonly logger = new Logger(StockReservationService.name);
 
-  constructor(private readonly dbService: DatabaseService) {}
+  constructor(@Inject(DRIZZLE_DB) private readonly db: any) {}
 
   /**
    * Concurrency-safe stock reservation using SELECT ... FOR UPDATE row locks.
@@ -17,7 +16,7 @@ export class StockReservationService {
   async reserveStock(quoteId: string, items: ReserveStockItemDto[]) {
     this.logger.log(`Reserving stock for quote ${quoteId} (${items.length} items)`);
 
-    return await this.dbService.db.transaction(async (tx) => {
+    return await this.db.transaction(async (tx: any) => {
       const reservationResults = [];
 
       for (const item of items) {
@@ -90,7 +89,7 @@ export class StockReservationService {
   async releaseStock(quoteId: string, items: ReserveStockItemDto[]) {
     this.logger.log(`Releasing reserved stock for quote ${quoteId} (${items.length} items)`);
 
-    return await this.dbService.db.transaction(async (tx) => {
+    return await this.db.transaction(async (tx: any) => {
       const releaseResults = [];
 
       for (const item of items) {
@@ -152,7 +151,7 @@ export class StockReservationService {
 
     const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
-    const result = await this.dbService.db.execute(
+    const result = await this.db.execute(
       sql`SELECT ws.id, ws.warehouse_id, w.code as warehouse_code, w.name as warehouse_name,
                  w.latitude, w.longitude,
                  ws.product_id, p.name as product_name, p.sku,

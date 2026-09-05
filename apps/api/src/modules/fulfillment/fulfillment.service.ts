@@ -1,14 +1,13 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
-import { fulfillmentSplits, backorders, warehouses } from '@dealflow360/database';
-import { eq, sql } from 'drizzle-orm';
+import { Injectable, Logger, Inject } from '@nestjs/common';
+import { DRIZZLE_DB } from '../database/database.module';
+import { sql } from 'drizzle-orm';
 import { SplitCalculationResult } from '@dealflow360/types';
 
 @Injectable()
 export class FulfillmentService {
   private readonly logger = new Logger(FulfillmentService.name);
 
-  constructor(private readonly dbService: DatabaseService) {}
+  constructor(@Inject(DRIZZLE_DB) private readonly db: any) {}
 
   /**
    * Save calculated fulfillment split plan and any backorders into the database.
@@ -16,7 +15,7 @@ export class FulfillmentService {
   async saveSplitPlan(plan: SplitCalculationResult) {
     this.logger.log(`Persisting fulfillment split plan for quote ${plan.quoteId}`);
 
-    return await this.dbService.db.transaction(async (tx) => {
+    return await this.db.transaction(async (tx: any) => {
       // Clear existing splits for this quote if re-calculating
       await tx.execute(
         sql`DELETE FROM fulfillment.fulfillment_splits WHERE quote_id = ${plan.quoteId}`
@@ -68,7 +67,7 @@ export class FulfillmentService {
    * Fetch fulfillment plan and delivery status for a quote.
    */
   async getSplitsByQuoteId(quoteId: string) {
-    const splitsResult = await this.dbService.db.execute(
+    const splitsResult = await this.db.execute(
       sql`SELECT fs.id, fs.quote_id, fs.warehouse_id, w.code as warehouse_code, w.name as warehouse_name,
                  w.latitude as warehouse_latitude, w.longitude as warehouse_longitude,
                  fs.product_id, p.name as product_name, p.sku,
@@ -81,7 +80,7 @@ export class FulfillmentService {
           ORDER BY w.name, p.name`
     );
 
-    const backordersResult = await this.dbService.db.execute(
+    const backordersResult = await this.db.execute(
       sql`SELECT bo.id, bo.quote_id, bo.product_id, p.name as product_name, p.sku,
                  bo.requested_qty, bo.allocated_qty, bo.backorder_qty, bo.status,
                  bo.estimated_restock_date, bo.created_at
@@ -101,7 +100,7 @@ export class FulfillmentService {
    * List all active regional warehouse distribution hubs with their spatial coordinates.
    */
   async getWarehouses() {
-    const result = await this.dbService.db.execute(
+    const result = await this.db.execute(
       sql`SELECT id, code, name, address, latitude, longitude, is_active, created_at
           FROM fulfillment.warehouses
           WHERE is_active = true
