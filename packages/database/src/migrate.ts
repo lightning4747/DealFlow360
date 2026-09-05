@@ -384,33 +384,176 @@ async function runMigrations() {
       CREATE TABLE IF NOT EXISTS billing.subscriptions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         customer_id UUID NOT NULL,
+        account_id UUID,
+        quote_id UUID,
         quote_line_id UUID,
+        product_id UUID,
         plan_name VARCHAR(255) NOT NULL,
         status VARCHAR(50) NOT NULL DEFAULT 'active',
+        quantity INTEGER NOT NULL DEFAULT 1,
+        unit_price NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0.00,
         monthly_amount NUMERIC(12,2) NOT NULL,
+        amount NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+        mrr NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+        billing_interval VARCHAR(50) NOT NULL DEFAULT 'monthly',
+        interval_days INTEGER NOT NULL DEFAULT 30,
+        current_period_start TIMESTAMPTZ,
+        current_period_end TIMESTAMPTZ,
+        next_billing_date TIMESTAMPTZ,
+        auto_renew BOOLEAN NOT NULL DEFAULT true,
         started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         renews_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        cancelled_at TIMESTAMPTZ,
+        cancellation_reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `;
+
+    await sqlClient`
+      ALTER TABLE billing.subscriptions
+      ADD COLUMN IF NOT EXISTS account_id UUID,
+      ADD COLUMN IF NOT EXISTS quote_id UUID,
+      ADD COLUMN IF NOT EXISTS product_id UUID,
+      ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS unit_price NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS amount NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS mrr NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+      ADD COLUMN IF NOT EXISTS billing_interval VARCHAR(50) NOT NULL DEFAULT 'monthly',
+      ADD COLUMN IF NOT EXISTS interval_days INTEGER NOT NULL DEFAULT 30,
+      ADD COLUMN IF NOT EXISTS current_period_start TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS next_billing_date TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS auto_renew BOOLEAN NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS cancellation_reason TEXT,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+    `;
+
     await sqlClient`
       CREATE TABLE IF NOT EXISTS billing.invoices (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         invoice_number VARCHAR(50) NOT NULL UNIQUE,
         customer_id UUID NOT NULL,
+        account_id UUID,
         quote_id UUID,
-        total_amount NUMERIC(12,2) NOT NULL,
+        invoice_type VARCHAR(50) NOT NULL DEFAULT 'one_time',
+        total_amount NUMERIC(14,2) NOT NULL,
+        subtotal NUMERIC(14,2) DEFAULT 0.00,
+        tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        discount_amount NUMERIC(12,2) DEFAULT 0.00,
+        currency VARCHAR(10) NOT NULL DEFAULT 'USD',
         status VARCHAR(50) NOT NULL DEFAULT 'pending',
         due_date TIMESTAMPTZ NOT NULL,
+        issued_at TIMESTAMPTZ DEFAULT now(),
+        paid_at TIMESTAMPTZ,
+        voided_at TIMESTAMPTZ,
+        void_reason TEXT,
+        voided_by UUID,
+        sent_to VARCHAR(320),
+        sent_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `;
+
+    await sqlClient`
+      ALTER TABLE billing.invoices
+      ADD COLUMN IF NOT EXISTS account_id UUID,
+      ADD COLUMN IF NOT EXISTS invoice_type VARCHAR(50) NOT NULL DEFAULT 'one_time',
+      ADD COLUMN IF NOT EXISTS subtotal NUMERIC(14,2) DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+      ADD COLUMN IF NOT EXISTS issued_at TIMESTAMPTZ DEFAULT now(),
+      ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS void_reason TEXT,
+      ADD COLUMN IF NOT EXISTS voided_by UUID,
+      ADD COLUMN IF NOT EXISTS sent_to VARCHAR(320),
+      ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+    `;
+
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS billing.invoice_lines (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        invoice_id UUID NOT NULL REFERENCES billing.invoices(id) ON DELETE CASCADE,
+        quote_line_id UUID,
+        product_id UUID,
+        description TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        unit_price NUMERIC(12,2) NOT NULL,
+        discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0.00,
+        total_price NUMERIC(14,2) NOT NULL,
+        fulfillment_required BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `;
+
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS billing.billing_schedules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        subscription_id UUID NOT NULL REFERENCES billing.subscriptions(id) ON DELETE CASCADE,
+        schedule_date TIMESTAMPTZ NOT NULL,
+        period_start TIMESTAMPTZ NOT NULL,
+        period_end TIMESTAMPTZ NOT NULL,
+        due_date TIMESTAMPTZ NOT NULL,
+        amount NUMERIC(14,2) NOT NULL,
+        currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        invoice_id UUID,
+        invalidated_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `;
+
     await sqlClient`
       CREATE TABLE IF NOT EXISTS billing.credit_notes (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        invoice_id UUID NOT NULL REFERENCES billing.invoices(id),
-        amount NUMERIC(12,2) NOT NULL,
+        credit_note_number VARCHAR(50) NOT NULL UNIQUE,
+        customer_id UUID,
+        account_id UUID,
+        subscription_id UUID REFERENCES billing.subscriptions(id) ON DELETE SET NULL,
+        invoice_id UUID REFERENCES billing.invoices(id) ON DELETE SET NULL,
+        amount NUMERIC(14,2) NOT NULL,
+        currency VARCHAR(10) NOT NULL DEFAULT 'USD',
         reason TEXT NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'issued',
+        issued_by UUID,
+        issued_at TIMESTAMPTZ DEFAULT now(),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `;
+
+    await sqlClient`
+      ALTER TABLE billing.credit_notes
+      ADD COLUMN IF NOT EXISTS credit_note_number VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS customer_id UUID,
+      ADD COLUMN IF NOT EXISTS account_id UUID,
+      ADD COLUMN IF NOT EXISTS subscription_id UUID REFERENCES billing.subscriptions(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+      ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'issued',
+      ADD COLUMN IF NOT EXISTS issued_by UUID,
+      ADD COLUMN IF NOT EXISTS issued_at TIMESTAMPTZ DEFAULT now();
+    `;
+
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS billing.payments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        invoice_id UUID NOT NULL REFERENCES billing.invoices(id) ON DELETE RESTRICT,
+        customer_id UUID NOT NULL,
+        account_id UUID,
+        amount NUMERIC(14,2) NOT NULL,
+        currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        payment_method VARCHAR(50) NOT NULL DEFAULT 'card',
+        gateway_transaction_id VARCHAR(255),
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `;
