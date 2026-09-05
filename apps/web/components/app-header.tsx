@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 
 const NAV_TABS = [
   { name: 'Dashboard', href: '/' },
@@ -18,6 +19,7 @@ const NAV_TABS = [
 
 export function AppHeader() {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
   return (
     <header className="h-14 border-b border-[#222] bg-[#0c0c0c] px-6 flex items-center justify-between sticky top-0 z-50">
@@ -49,9 +51,28 @@ export function AppHeader() {
         </nav>
       </div>
       <div className="flex items-center space-x-3 shrink-0 ml-4">
-        <div className="text-xs text-gray-400 border border-[#222] px-2.5 py-1 rounded bg-[#111]">
-          Sales Workspace
-        </div>
+        {user ? (
+          <div className="flex items-center space-x-2.5">
+            <div className="text-right">
+              <div className="text-xs font-medium text-white">{user.name}</div>
+              <div className="text-[10px] text-gray-400 capitalize font-mono">{user.role.replace('_', ' ')}</div>
+            </div>
+            <button
+              onClick={logout}
+              title="Sign Out"
+              className="text-xs text-gray-400 hover:text-white border border-[#333] px-2.5 py-1 rounded bg-[#111] hover:bg-[#1f1f1f] transition"
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <Link
+            href="/login"
+            className="px-3 py-1.5 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition"
+          >
+            Sign In
+          </Link>
+        )}
       </div>
     </header>
   );

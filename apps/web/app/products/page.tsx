@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { AppHeader } from '@/components/app-header';
 
+import { getAuthHeaders, API_BASE_URL } from '@/lib/api-client';
+
 interface ProductItem {
   id: string;
   name: string;
@@ -18,12 +20,12 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`${apiUrl}/sales/products?limit=20`);
+        const res = await fetch(`${API_BASE_URL}/sales/products?limit=50`, {
+          headers: getAuthHeaders(),
+        });
         if (res.ok) {
           const json = await res.json();
           const list = json.data || [];
@@ -54,7 +56,7 @@ export default function ProductsPage() {
       }
     }
     load();
-  }, [apiUrl]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-black text-white">
