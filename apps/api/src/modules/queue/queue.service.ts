@@ -12,6 +12,7 @@ import {
 import { SpatialAllocationEngine } from '../fulfillment/spatial-allocation.engine';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
 import { KafkaService } from '../events/kafka/kafka.service';
+import { getCorrelationId, getTenantId, runWithContext } from '../../common/logging/request-context';
 
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
@@ -100,24 +101,26 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    // Initialize Workers
+    // Initialize Workers with runWithContext propagation
     this.approvalWorker = new Worker<ApprovalRoutingJobPayload>(
       'approval-routing',
       async (job: Job<ApprovalRoutingJobPayload>) => {
-        this.logger.log(`Processing approval-routing job ${job.id} for quote ${job.data.quoteId}`);
-        if (job.data.brs > 50) {
-          await this.enqueueEmail({
-            to: 'admin@dealflow360.com',
-            recipientName: 'Administrator',
-            templateId: 'high-risk-alert',
-            variables: {
-              quoteId: job.data.quoteId,
-              brs: job.data.brs,
-            },
-            idempotencyKey: `high-risk-${job.data.quoteId}`,
-          });
-        }
-        return { processed: true, quoteId: job.data.quoteId };
+        return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
+          this.logger.log(`Processing approval-routing job ${job.id} for quote ${job.data.quoteId}`);
+          if (job.data.brs > 50) {
+            await this.enqueueEmail({
+              to: 'admin@dealflow360.com',
+              recipientName: 'Administrator',
+              templateId: 'high-risk-alert',
+              variables: {
+                quoteId: job.data.quoteId,
+                brs: job.data.brs,
+              },
+              idempotencyKey: `high-risk-${job.data.quoteId}`,
+            });
+          }
+          return { processed: true, quoteId: job.data.quoteId };
+        });
       },
       { connection, concurrency: 5 },
     );
@@ -125,8 +128,10 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.emailWorker = new Worker<EmailNotificationJobPayload>(
       'email-notifications',
       async (job: Job<EmailNotificationJobPayload>) => {
-        this.logger.log(`Sending email [${job.data.templateId}] to ${job.data.to} (key: ${job.data.idempotencyKey})`);
-        return { delivered: true, recipient: job.data.to, template: job.data.templateId };
+        return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
+          this.logger.log(`Sending email [${job.data.templateId}] to ${job.data.to} (key: ${job.data.idempotencyKey})`);
+          return { delivered: true, recipient: job.data.to, template: job.data.templateId };
+        });
       },
       {
         connection,
@@ -138,21 +143,23 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.fulfillmentWorker = new Worker<FulfillmentSplitJobPayload>(
       'fulfillment-split',
       async (job: Job<FulfillmentSplitJobPayload>) => {
-        this.logger.log(`Processing fulfillment-split job ${job.id} for quote ${job.data.quoteId}`);
-        const splitResult = await this.spatialEngine.calculateFulfillmentSplit(job.data);
-        await this.fulfillmentService.saveSplitPlan(splitResult);
+        return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
+          this.logger.log(`Processing fulfillment-split job ${job.id} for quote ${job.data.quoteId}`);
+          const splitResult = await this.spatialEngine.calculateFulfillmentSplit(job.data);
+          await this.fulfillmentService.saveSplitPlan(splitResult);
 
-        await this.kafkaService.publishEvent(
-          'fulfillment.events',
-          'FULFILLMENT_SPLIT_CALCULATED',
-          job.data.quoteId,
-          {
-            ...splitResult,
-            timestamp: new Date().toISOString(),
-          },
-        );
+          await this.kafkaService.publishEvent(
+            'fulfillment.events',
+            'FULFILLMENT_SPLIT_CALCULATED',
+            job.data.quoteId,
+            {
+              ...splitResult,
+              timestamp: new Date().toISOString(),
+            },
+          );
 
-        return { processed: true, quoteId: job.data.quoteId, hubCount: splitResult.hubCount };
+          return { processed: true, quoteId: job.data.quoteId, hubCount: splitResult.hubCount };
+        });
       },
       { connection, concurrency: 5 },
     );
@@ -160,8 +167,10 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.invoiceGenerationWorker = new Worker<InvoiceGenerationJobPayload>(
       'invoice-generation',
       async (job: Job<InvoiceGenerationJobPayload>) => {
-        this.logger.log(`Processing invoice-generation PDF job for invoice ${job.data.invoiceId}`);
-        return { generated: true, invoiceId: job.data.invoiceId };
+        return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
+          this.logger.log(`Processing invoice-generation PDF job for invoice ${job.data.invoiceId}`);
+          return { generated: true, invoiceId: job.data.invoiceId };
+        });
       },
       { connection, concurrency: 5 },
     );
@@ -169,8 +178,10 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.billingScheduleWorker = new Worker<BillingScheduleJobPayload>(
       'billing-schedule-generation',
       async (job: Job<BillingScheduleJobPayload>) => {
-        this.logger.log(`Processing billing schedule sweep for subscription ${job.data.subscriptionId}`);
-        return { processed: true, subscriptionId: job.data.subscriptionId };
+        return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
+          this.logger.log(`Processing billing schedule sweep for subscription ${job.data.subscriptionId}`);
+          return { processed: true, subscriptionId: job.data.subscriptionId };
+        });
       },
       { connection, concurrency: 5 },
     );
@@ -178,8 +189,10 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.prorationWorker = new Worker<ProrationCalculationJobPayload>(
       'proration-calculation',
       async (job: Job<ProrationCalculationJobPayload>) => {
-        this.logger.log(`Processing async proration for subscription ${job.data.subscriptionId}`);
-        return { processed: true, subscriptionId: job.data.subscriptionId };
+        return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
+          this.logger.log(`Processing async proration for subscription ${job.data.subscriptionId}`);
+          return { processed: true, subscriptionId: job.data.subscriptionId };
+        });
       },
       { connection, concurrency: 5 },
     );
@@ -216,38 +229,46 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     await this.prorationQueue.close();
   }
 
+  private enrichPayload<T extends { correlationId?: string; tenantId?: string }>(payload: T): T {
+    return {
+      correlationId: getCorrelationId(),
+      tenantId: getTenantId(),
+      ...payload,
+    };
+  }
+
   async enqueueApprovalRouting(payload: ApprovalRoutingJobPayload): Promise<void> {
-    await this.approvalRoutingQueue.add('route-approval', payload, {
+    await this.approvalRoutingQueue.add('route-approval', this.enrichPayload(payload), {
       jobId: `approval-${payload.quoteId}-${Date.now()}`,
     });
   }
 
   async enqueueEmail(payload: EmailNotificationJobPayload): Promise<void> {
-    await this.emailNotificationQueue.add('send-email', payload, {
+    await this.emailNotificationQueue.add('send-email', this.enrichPayload(payload), {
       jobId: payload.idempotencyKey,
     });
   }
 
   async enqueueFulfillmentSplit(payload: FulfillmentSplitJobPayload): Promise<void> {
-    await this.fulfillmentSplitQueue.add('calculate-split', payload, {
+    await this.fulfillmentSplitQueue.add('calculate-split', this.enrichPayload(payload), {
       jobId: `fulfillment-split-${payload.quoteId}-${Date.now()}`,
     });
   }
 
   async enqueueInvoiceGeneration(payload: InvoiceGenerationJobPayload): Promise<void> {
-    await this.invoiceGenerationQueue.add('generate-invoice', payload, {
+    await this.invoiceGenerationQueue.add('generate-invoice', this.enrichPayload(payload), {
       jobId: `invoice-gen-${payload.invoiceId}-${Date.now()}`,
     });
   }
 
   async enqueueBillingScheduleGeneration(payload: BillingScheduleJobPayload): Promise<void> {
-    await this.billingScheduleQueue.add('generate-schedule', payload, {
+    await this.billingScheduleQueue.add('generate-schedule', this.enrichPayload(payload), {
       jobId: `billing-sched-${payload.subscriptionId}-${Date.now()}`,
     });
   }
 
   async enqueueProration(payload: ProrationCalculationJobPayload): Promise<void> {
-    await this.prorationQueue.add('compute-proration', payload, {
+    await this.prorationQueue.add('compute-proration', this.enrichPayload(payload), {
       jobId: `proration-${payload.subscriptionId}-${Date.now()}`,
     });
   }

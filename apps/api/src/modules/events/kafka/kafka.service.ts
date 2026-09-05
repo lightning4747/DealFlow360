@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Kafka, Producer, Consumer } from 'kafkajs';
 import { KafkaEventEnvelope } from './kafka-events.types';
 import * as crypto from 'crypto';
+import { getCorrelationId } from '../../../common/logging/request-context';
 
 @Injectable()
 export class KafkaService implements OnModuleInit, OnModuleDestroy {
@@ -52,8 +53,9 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
         eachMessage: async ({ topic, partition, message }) => {
           try {
             const eventType = message.headers?.eventType?.toString() || 'unknown';
+            const correlationId = message.headers?.correlationId?.toString() || 'unknown';
             const payload = message.value ? JSON.parse(message.value.toString()) : null;
-            this.logger.log(`Received event [${eventType}] on ${topic}[${partition}]`);
+            this.logger.log(`Received event [${eventType}] correlationId [${correlationId}] on ${topic}[${partition}]`);
           } catch (err: any) {
             this.logger.error(`Error processing Kafka message on ${topic}: ${err.message}`);
           }
@@ -80,6 +82,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
   }
 
   async publishEvent<T>(topic: string, eventType: string, partitionKey: string, data: T): Promise<void> {
+    const correlationId = getCorrelationId();
     const envelope: KafkaEventEnvelope<T> = {
       eventId: crypto.randomUUID(),
       producedAt: new Date().toISOString(),
@@ -91,7 +94,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
     };
 
     if (!this.isConnected) {
-      this.logger.warn(`Kafka offline: simulated emit of [${eventType}] on topic ${topic}`);
+      this.logger.warn(`Kafka offline: simulated emit of [${eventType}] on topic ${topic} with correlationId ${correlationId}`);
       return;
     }
 
@@ -105,11 +108,12 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
             headers: {
               eventType,
               schemaVersion: '1.0',
+              correlationId,
             },
           },
         ],
       });
-      this.logger.log(`Published event [${eventType}] to topic ${topic} (key: ${partitionKey})`);
+      this.logger.log(`Published event [${eventType}] to topic ${topic} (key: ${partitionKey}, correlationId: ${correlationId})`);
     } catch (err: any) {
       this.logger.error(`Failed to publish event [${eventType}] to ${topic}: ${err.message}`);
     }

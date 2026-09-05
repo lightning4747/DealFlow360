@@ -1,4 +1,9 @@
-export interface EmailNotificationJobPayload {
+export interface BaseJobPayload {
+  correlationId?: string;
+  tenantId?: string;
+}
+
+export interface EmailNotificationJobPayload extends BaseJobPayload {
   to: string;
   recipientName: string;
   templateId:
@@ -12,7 +17,7 @@ export interface EmailNotificationJobPayload {
   idempotencyKey: string;
 }
 
-export interface ApprovalRoutingJobPayload {
+export interface ApprovalRoutingJobPayload extends BaseJobPayload {
   quoteId: string;
   repId: string;
   customerId: string;
@@ -21,7 +26,7 @@ export interface ApprovalRoutingJobPayload {
   escalationDeadlineHours?: number;
 }
 
-export interface FulfillmentSplitJobPayload {
+export interface FulfillmentSplitJobPayload extends BaseJobPayload {
   quoteId: string;
   customerId?: string | null;
   destinationLatitude?: number | null;
@@ -32,7 +37,7 @@ export interface FulfillmentSplitJobPayload {
   }[];
 }
 
-export interface InvoiceGenerationJobPayload {
+export interface InvoiceGenerationJobPayload extends BaseJobPayload {
   invoiceId: string;
   quoteId?: string | null;
   billingScheduleId?: string | null;
@@ -41,15 +46,14 @@ export interface InvoiceGenerationJobPayload {
   currency?: string;
 }
 
-export interface BillingScheduleJobPayload {
+export interface BillingScheduleJobPayload extends BaseJobPayload {
   subscriptionId: string;
   scheduleDate: string;
   amount: string;
 }
 
-export interface ProrationCalculationJobPayload {
+export interface ProrationCalculationJobPayload extends BaseJobPayload {
   subscriptionId: string;
   targetQuantity: number;
   effectiveDate: string;
 }
-
