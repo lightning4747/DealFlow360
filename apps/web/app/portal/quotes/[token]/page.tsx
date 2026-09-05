@@ -2,27 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
 
 export default function CustomerPortalNegotiationPage() {
   const params = useParams();
-  const token = (params?.token as string) || 'demo-token';
+  const token = params?.token as string;
 
   const [quote, setQuote] = useState<any>(null);
   const [counterDiscount, setCounterDiscount] = useState<number>(15);
   const [customerComment, setCustomerComment] = useState('');
-  const [comments, setComments] = useState<any[]>([
-    {
-      id: '1',
-      participantName: 'Procurement (Buyer)',
-      notes: 'Can this be 15% all upfront if we sign this month?',
-      date: 'Aug 22',
-    },
-  ]);
+  const [comments, setComments] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [portalToken, setPortalToken] = useState<string | null>(null);
-  const [liveUsers, setLiveUsers] = useState<string[]>(['Customer Procurement']);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -68,46 +59,6 @@ export default function CustomerPortalNegotiationPage() {
 
     loadQuote();
 
-    // Socket.IO Real-Time Gateway Connection
-    let socket: Socket | null = null;
-    try {
-      socket = io('http://localhost:8000/negotiation', {
-        transports: ['websocket'],
-      });
-
-      socket.on('connect', () => {
-        socket?.emit('joinQuoteRoom', {
-          quoteId: 'Q-1042',
-          userRole: 'customer',
-          userId: 'customer-procurement',
-          userName: 'Acme Procurement',
-        });
-      });
-
-      socket.on('userPresenceChanged', (presence: any) => {
-        if (presence?.userName) {
-          setLiveUsers((prev) => Array.from(new Set([...prev, presence.userName])));
-        }
-      });
-
-      socket.on('counterProposalSubmitted', (event: any) => {
-        setComments((prev) => [
-          ...prev,
-          {
-            id: String(Date.now()),
-            participantName: event.participantName,
-            notes: `Counter proposal: ${event.counterDiscountPct}% discount proposed. Notes: ${event.notes || 'None'}`,
-            date: 'Just now',
-          },
-        ]);
-      });
-    } catch {
-      // Safe fallback
-    }
-
-    return () => {
-      socket?.disconnect();
-    };
   }, [token, apiUrl]);
 
   const handleSubmitCounter = async (e: React.FormEvent) => {

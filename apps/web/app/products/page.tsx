@@ -44,15 +44,11 @@ export default function ProductsPage() {
             }))
           );
         } else {
-          throw new Error('Fallback');
+          throw new Error(`Failed to load products (HTTP ${res.status})`);
         }
-      } catch {
-        setProducts([
-          { id: '1', name: 'Laptop Pro 14', category: 'Hardware', variants: 'Space Gray', price: '$1,250.00', unit: 'Each', tax: '12%', status: 'Active' },
-          { id: '2', name: 'Onsite Setup Service', category: 'Services', variants: 'Standard', price: '$450.00', unit: 'Each', tax: '18%', status: 'Active' },
-          { id: '3', name: 'Docking Station', category: 'Hardware', variants: 'USB-C Dual', price: '$180.00', unit: 'Each', tax: '10%', status: 'Active' },
-          { id: '4', name: 'Care Plan 2yr', category: 'Subscription', variants: '24 Month SLA', price: '$45.00/month', unit: 'Recurring', tax: '0%', status: 'Active' },
-        ]);
+      } catch (err) {
+        console.error('Failed to load products:', err);
+        setProducts([]);
       } finally {
         setLoading(false);
       }

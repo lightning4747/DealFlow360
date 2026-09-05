@@ -20,6 +20,8 @@ Implemented in this slice:
 
 Remaining mock surfaces are tracked separately and must be removed page by page; Quick-Select Demo Personas remain intentionally unchanged.
 
+This slice also removed fabricated product fallback rows, approval fallback rows and offline approval success, client-side quote calculation fallback, and hardcoded portal comments/presence/socket identity. Failed API calls now show empty/error states instead of pretending persisted data exists.
+
 ### Workstream 2 — Seed deterministic end-to-end scenarios
 
 Scope: provide repeatable records for quotation, approval, inventory split/backorder, one-time invoice, recurring subscription, and billing schedule testing. Seed records use stable business identifiers and are safe to rerun without accumulating duplicate schedules or fulfillment plans.

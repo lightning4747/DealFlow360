@@ -157,43 +157,7 @@ export default function NewQuotationPage() {
           const json = await calcRes.json();
           setSummary(json.data);
         } else {
-          // Client fallback calculation
-          let subtotal = 0;
-          let totalCost = 0;
-          let discountTotal = 0;
-          const calculatedLines = lines.map((l) => {
-            const lineSub = l.quantity * l.unitPrice;
-            const lineDisc = lineSub * (l.discountPct / 100);
-            const lineTot = lineSub - lineDisc;
-            const lineCost = l.quantity * l.unitCost;
-            subtotal += lineSub;
-            discountTotal += lineDisc;
-            totalCost += lineCost;
-            return {
-              ...l,
-              subtotal: lineSub,
-              discountAmount: lineDisc,
-              lineTotal: lineTot,
-              appliedCeilingPct: 15,
-              isCeilingViolated: l.discountPct > 15,
-            };
-          });
-          const totalAmount = subtotal - discountTotal;
-          const grossMargin = totalAmount - totalCost;
-          const grossMarginPct = totalAmount > 0 ? (grossMargin / totalAmount) * 100 : 0;
-          setSummary({
-            subtotalAmount: subtotal,
-            totalDiscountAmount: discountTotal,
-            totalAmount,
-            totalCost,
-            grossMarginAmount: grossMargin,
-            grossMarginPct,
-            marginHealth: grossMarginPct >= 35 ? 'healthy' : grossMarginPct >= 20 ? 'caution' : 'critical',
-            brsScore: 0,
-            requiresApproval: lines.some((l) => l.discountPct > 15),
-            approvalLevel: lines.some((l) => l.discountPct > 20) ? 'level_2' : lines.some((l) => l.discountPct > 15) ? 'level_1' : 'none',
-            lines: calculatedLines,
-          });
+          throw new Error(`Quote calculation failed (HTTP ${calcRes.status})`);
         }
 
         // Fetch upsell recommendations

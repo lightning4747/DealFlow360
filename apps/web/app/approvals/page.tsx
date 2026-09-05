@@ -19,46 +19,10 @@ interface ApprovalRow {
   requestedDiscount?: string;
 }
 
-const INITIAL_ROWS: ApprovalRow[] = [
-  {
-    id: 'app-001',
-    quoteId: 'Q-1042',
-    customer: 'Acme Corp',
-    blendedRisk: 'HIGH',
-    stage: 'Sales Manager',
-    assignedTo: 'Carol Manager',
-    status: 'pending',
-    totalAmount: '$12,400',
-    requestedDiscount: '18% on Server',
-  },
-  {
-    id: 'app-002',
-    quoteId: 'Q-1039',
-    customer: 'Beta Industries',
-    blendedRisk: 'MEDIUM',
-    stage: 'Finance',
-    assignedTo: 'Dave Finance',
-    status: 'pending',
-    totalAmount: '$29,700',
-    requestedDiscount: '12% on Storage',
-  },
-  {
-    id: 'app-003',
-    quoteId: 'Q-1035',
-    customer: 'Nova Retail',
-    blendedRisk: 'LOW',
-    stage: 'Auto Approved',
-    assignedTo: 'Auto Approved',
-    status: 'approved',
-    totalAmount: '$5,750',
-    requestedDiscount: '4% Standard',
-  },
-];
-
 export default function ApprovalsPage() {
   const { user } = useAuth();
   const [filter, setFilter] = useState<'pending' | 'returned' | 'approved' | 'rejected'>('pending');
-  const [approvals, setApprovals] = useState<ApprovalRow[]>(INITIAL_ROWS);
+  const [approvals, setApprovals] = useState<ApprovalRow[]>([]);
   const [selectedApproval, setSelectedApproval] = useState<ApprovalRow | null>(null);
   const [actionReason, setActionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -73,7 +37,7 @@ export default function ApprovalsPage() {
         });
         if (res.ok) {
           const json = await res.json();
-          if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          if (json.data && Array.isArray(json.data)) {
             setApprovals(
               json.data.map((item: any) => ({
                 id: item.id,
@@ -90,7 +54,8 @@ export default function ApprovalsPage() {
           }
         }
       } catch (e) {
-        // Fallback to initial rows
+        setApprovals([]);
+        setActionMessage('Unable to load approvals from the backend.');
       }
     }
     fetchApprovals();
@@ -110,8 +75,12 @@ export default function ApprovalsPage() {
           reason: actionReason || 'Exceeds allowable margin threshold.',
         }),
       });
+      if (!res.ok) {
+        const error = await res.json().catch(() => null);
+        throw new Error(error?.message || `Approval request failed (HTTP ${res.status})`);
+      }
 
-      // Optimistic update
+      // Refresh from the server so the UI reflects the persisted decision.
       setApprovals((prev) =>
         prev.map((a) => (a.id === selectedApproval.id ? { ...a, status: decision } : a))
       );
@@ -121,17 +90,8 @@ export default function ApprovalsPage() {
         setActionReason('');
         setActionMessage(null);
       }, 1500);
-    } catch (e) {
-      // Still update UI in demo mode
-      setApprovals((prev) =>
-        prev.map((a) => (a.id === selectedApproval.id ? { ...a, status: decision } : a))
-      );
-      setActionMessage(`Quotation ${selectedApproval.quoteId} ${decision} (offline mode).`);
-      setTimeout(() => {
-        setSelectedApproval(null);
-        setActionReason('');
-        setActionMessage(null);
-      }, 1500);
+    } catch (e: any) {
+      setActionMessage(e.message || 'Approval request failed.');
     } finally {
       setActionLoading(false);
     }
