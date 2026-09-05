@@ -31,7 +31,7 @@ export default function DashboardPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          <Link href="/quotations" className="px-4 py-2 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition">
+          <Link href="/quotations/new" className="px-4 py-2 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition">
             + New Quotation
           </Link>
           <Link href="/approvals" className="px-4 py-2 rounded text-xs font-medium border border-[#333] text-gray-300 hover:bg-[#1a1a1a] transition">

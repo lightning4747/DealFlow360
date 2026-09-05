@@ -61,9 +61,12 @@ export default function QuotationsPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="px-3 py-1.5 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition">
+            <Link
+              href="/quotations/new"
+              className="px-3 py-1.5 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition"
+            >
               + New Quotation
-            </button>
+            </Link>
             <button className="px-3 py-1.5 rounded text-xs font-medium border border-[#333] text-gray-300 hover:bg-[#1a1a1a] transition">
               Switch to Table View
             </button>
@@ -80,14 +83,15 @@ export default function QuotationsPage() {
               </div>
               <div className="space-y-2 flex-1">
                 {col.items.map((item) => (
-                  <div
+                  <Link
                     key={item.id}
-                    className="p-3 rounded border border-[#262626] bg-[#141414] hover:border-gray-500 transition cursor-pointer"
+                    href={`/quotations/${item.id}`}
+                    className="block p-3 rounded border border-[#262626] bg-[#141414] hover:border-gray-500 transition cursor-pointer"
                   >
                     <div className="text-xs font-mono font-semibold text-white">{item.id}</div>
                     <div className="text-xs text-gray-300 mt-1">{item.customer}</div>
                     <div className="text-xs font-mono text-gray-400 mt-1">{item.amount}</div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
