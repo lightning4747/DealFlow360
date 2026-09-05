@@ -18,6 +18,7 @@ import {
   customers,
   quotes,
   products,
+  payments,
 } from '@dealflow360/database';
 import { ProrationEngine } from './proration.engine';
 import { ScheduleGeneratorService } from './schedule-generator.service';
@@ -698,4 +699,49 @@ export class BillingService {
       };
     });
   }
+
+  async recordPayment(params: {
+    invoiceId: string;
+    tenantId: string;
+    amount: number;
+    paymentMethod: string;
+    referenceTransactionId?: string;
+  }) {
+    return await this.db.transaction(async (tx: any) => {
+      const invoice = await tx.query.invoices.findFirst({
+        where: eq(invoices.id, params.invoiceId),
+      });
+
+      if (!invoice) {
+        throw new NotFoundException(`Invoice ${params.invoiceId} not found`);
+      }
+
+      const paymentId = crypto.randomUUID();
+      await tx.insert(payments).values({
+        id: paymentId,
+        invoiceId: params.invoiceId,
+        customerId: invoice.customerId,
+        accountId: invoice.accountId,
+        amount: params.amount.toFixed(2),
+        currency: invoice.currency,
+        status: 'succeeded',
+        paymentMethod: params.paymentMethod,
+        gatewayTransactionId: params.referenceTransactionId || null,
+        createdAt: new Date(),
+      });
+
+      // Update invoice status to paid
+      await tx
+        .update(invoices)
+        .set({
+          status: 'paid',
+          paidAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(invoices.id, params.invoiceId));
+
+      return { paymentId, status: 'succeeded' };
+    });
+  }
 }
+
