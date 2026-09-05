@@ -41,8 +41,11 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       this.logger.log('Kafka Producer connected successfully.');
 
       await this.consumer.connect();
-      await this.consumer.subscribe({ topics: ['quote.events', 'approval.events'], fromBeginning: false });
-      this.logger.log('Kafka Consumer subscribed to quote.events and approval.events.');
+      await this.consumer.subscribe({
+        topics: ['quote.events', 'approval.events', 'fulfillment.events'],
+        fromBeginning: false,
+      });
+      this.logger.log('Kafka Consumer subscribed to quote.events, approval.events, and fulfillment.events.');
 
       // Run consumer loop asynchronously in background so NestJS HTTP starts immediately
       this.consumer.run({

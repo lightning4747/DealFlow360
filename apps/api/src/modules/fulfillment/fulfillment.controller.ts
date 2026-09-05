@@ -9,10 +9,13 @@ import {
 } from '@nestjs/common';
 import { FulfillmentService } from './fulfillment.service';
 import { StockReservationService } from './stock-reservation.service';
+import { SpatialAllocationEngine } from './spatial-allocation.engine';
+import { QueueService } from '../queue/queue.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/auth.decorator';
 import {
+  CalculateFulfillmentSplitSchema,
   ReserveStockRequestSchema,
   ReleaseStockRequestSchema,
 } from '@dealflow360/types';
@@ -23,6 +26,8 @@ export class FulfillmentController {
   constructor(
     private readonly fulfillmentService: FulfillmentService,
     private readonly stockReservationService: StockReservationService,
+    private readonly spatialEngine: SpatialAllocationEngine,
+    private readonly queueService: QueueService,
   ) {}
 
   @Get('warehouses')
@@ -47,6 +52,31 @@ export class FulfillmentController {
   async getSplitsByQuoteId(@Param('quoteId') quoteId: string) {
     const data = await this.fulfillmentService.getSplitsByQuoteId(quoteId);
     return { data, meta: null, error: null };
+  }
+
+  @Post('calculate')
+  @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
+  async calculateFulfillmentSplit(@Body() body: any) {
+    const dto = CalculateFulfillmentSplitSchema.parse(body);
+    const plan = await this.spatialEngine.calculateFulfillmentSplit(dto);
+    await this.fulfillmentService.saveSplitPlan(plan);
+    return { data: plan, meta: null, error: null };
+  }
+
+  @Post('calculate-async')
+  @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
+  async calculateFulfillmentSplitAsync(@Body() body: any) {
+    const dto = CalculateFulfillmentSplitSchema.parse(body);
+    await this.queueService.enqueueFulfillmentSplit(dto);
+    return {
+      data: {
+        quoteId: dto.quoteId,
+        queued: true,
+        message: 'Fulfillment split calculation enqueued to BullMQ worker',
+      },
+      meta: null,
+      error: null,
+    };
   }
 
   @Post('reserve')
