@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Kafka, Producer, Consumer } from 'kafkajs';
 import { KafkaEventEnvelope } from './kafka-events.types';
@@ -13,9 +13,9 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
   private consumer: Consumer;
   private isConnected = false;
 
-  constructor(private readonly configService: ConfigService) {
-    const brokers = (this.configService.get<string>('KAFKA_BOOTSTRAP_SERVERS') || 'localhost:9092').split(',');
-    const clientId = this.configService.get<string>('KAFKA_CLIENT_ID') || 'dealflow360-api';
+  constructor(@Optional() private readonly configService?: ConfigService) {
+    const brokers = (this.configService?.get<string>('KAFKA_BOOTSTRAP_SERVERS') || process.env.KAFKA_BOOTSTRAP_SERVERS || 'localhost:9092').split(',');
+    const clientId = this.configService?.get<string>('KAFKA_CLIENT_ID') || process.env.KAFKA_CLIENT_ID || 'dealflow360-api';
 
     this.kafka = new Kafka({
       clientId,

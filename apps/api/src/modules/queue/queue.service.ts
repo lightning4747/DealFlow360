@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Inject, forwardRef, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker, Job } from 'bullmq';
 import {
@@ -32,13 +32,13 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private prorationWorker: Worker<ProrationCalculationJobPayload>;
 
   constructor(
-    private readonly configService: ConfigService,
+    @Optional() private readonly configService: ConfigService,
     private readonly spatialEngine: SpatialAllocationEngine,
     private readonly fulfillmentService: FulfillmentService,
     private readonly kafkaService: KafkaService,
   ) {
-    const host = this.configService.get<string>('REDIS_HOST') || 'localhost';
-    const port = parseInt(this.configService.get<string>('REDIS_PORT') || '6379', 10);
+    const host = this.configService?.get<string>('REDIS_HOST') || process.env.REDIS_HOST || 'localhost';
+    const port = parseInt(this.configService?.get<string>('REDIS_PORT') || process.env.REDIS_PORT || '6379', 10);
     const connection = { host, port };
 
     this.approvalRoutingQueue = new Queue<ApprovalRoutingJobPayload>('approval-routing', {
