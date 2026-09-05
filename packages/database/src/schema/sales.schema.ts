@@ -22,6 +22,7 @@ export const userRoleEnum = salesSchema.enum('user_role', [
   'sales_rep',
   'sales_manager',
   'finance',
+  'customer',
 ]);
 
 export const customerTierEnum = salesSchema.enum('customer_tier', [

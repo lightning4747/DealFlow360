@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, ChevronDown, Check, Shield, Briefcase, DollarSign, UserCheck } from 'lucide-react';
+import { User, LogOut, ChevronDown, Check, Shield, Briefcase, DollarSign, UserCheck, Building2 } from 'lucide-react';
 
 interface CurrentUser {
   id: string;
@@ -42,6 +42,14 @@ const PRESET_ACCOUNTS = [
     label: 'Sales Representative (Quote Creator)',
     badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
     icon: Briefcase,
+  },
+  {
+    email: 'procurement@acme.com',
+    name: 'Acme Global Industries (Gold Enterprise)',
+    role: 'customer',
+    label: 'Customer Account (Buyer / Orders)',
+    badgeColor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+    icon: Building2,
   },
 ];
 

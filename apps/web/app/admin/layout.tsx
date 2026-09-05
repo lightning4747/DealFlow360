@@ -12,6 +12,7 @@ import {
   Server,
   Database,
   ExternalLink,
+  Building2,
 } from 'lucide-react';
 import { AccountSwitcher } from '../../components/account-switcher';
 
@@ -23,6 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Customer Tiers', href: '/admin/tiers', icon: Layers },
     { name: 'Price Lists', href: '/admin/price-lists', icon: FileSpreadsheet },
     { name: 'Governance Approvals', href: '/approvals', icon: ShieldCheck },
+    { name: 'Customer Portal (Acme)', href: '/customer/orders', icon: Building2 },
   ];
 
   return (
