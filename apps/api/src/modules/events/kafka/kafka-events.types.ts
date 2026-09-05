@@ -66,3 +66,40 @@ export interface ApprovalEscalatedPayload {
   toLevel: number;
   reason: string;
 }
+
+export interface FulfillmentSplitCalculatedPayload {
+  quoteId: string;
+  totalDistanceKm: number;
+  totalEstimatedShippingCost: number;
+  hubCount: number;
+  allocations: {
+    warehouseId: string;
+    warehouseCode: string;
+    warehouseName: string;
+    distanceKm: number;
+    shippingCostEstimate: number;
+    allocatedItems: {
+      productId: string;
+      productName: string;
+      sku: string;
+      quantity: number;
+      unitCost: number;
+    }[];
+  }[];
+  backorders: {
+    productId: string;
+    quantity: number;
+    reason: string;
+  }[];
+  timestamp: string;
+}
+
+export interface StockReservedPayload {
+  quoteId: string;
+  reservations: {
+    warehouseId: string;
+    productId: string;
+    reservedQuantity: number;
+  }[];
+  timestamp: string;
+}
