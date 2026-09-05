@@ -7,6 +7,9 @@ import { CustomerTiersModule } from './modules/customer-tiers/customer-tiers.mod
 import { PriceListsModule } from './modules/price-lists/price-lists.module';
 import { EventsModule } from './modules/events/events.module';
 import { GovernanceModule } from './modules/governance/governance.module';
+import { QuotesModule } from './modules/quotes/quotes.module';
+import { RecommendationsModule } from './modules/recommendations/recommendations.module';
+import { PortalModule } from './modules/portal/portal.module';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
 
 @Module({
@@ -15,6 +18,9 @@ import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
     DatabaseModule,
     EventsModule,
     GovernanceModule,
+    QuotesModule,
+    RecommendationsModule,
+    PortalModule,
     AuthModule,
     ProductsModule,
     CustomerTiersModule,
