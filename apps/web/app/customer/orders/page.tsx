@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Building2,
   FileCheck2,
@@ -33,6 +34,7 @@ interface CustomerQuote {
 }
 
 export default function CustomerOrdersPage() {
+  const router = useRouter();
   const [quotes, setQuotes] = useState<CustomerQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [signingQuoteId, setSigningQuoteId] = useState<string | null>(null);
@@ -44,10 +46,20 @@ export default function CustomerOrdersPage() {
       const stored = localStorage.getItem('currentUser');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.role) setUserRole(parsed.role);
+        if (parsed.role) {
+          setUserRole(parsed.role);
+          // Only customer role is allowed on this customer portal
+          if (parsed.role !== 'customer') {
+            if (parsed.role === 'sales_manager' || parsed.role === 'finance') {
+              router.push('/approvals');
+            } else {
+              router.push('/admin/products');
+            }
+          }
+        }
       }
     } catch {}
-  }, []);
+  }, [router]);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -133,26 +145,8 @@ export default function CustomerOrdersPage() {
           </div>
         </div>
 
-        {/* Links & Switcher */}
+        {/* Switcher */}
         <div className="flex items-center space-x-3">
-          {userRole === 'admin' && (
-            <>
-              <Link
-                href="/admin/products"
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition"
-              >
-                <Package className="h-3.5 w-3.5 text-blue-400" />
-                <span>Admin Catalog</span>
-              </Link>
-              <Link
-                href="/approvals"
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition"
-              >
-                <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
-                <span>Governance Queue</span>
-              </Link>
-            </>
-          )}
           <AccountSwitcher />
         </div>
       </header>
