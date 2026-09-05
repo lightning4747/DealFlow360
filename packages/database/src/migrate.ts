@@ -219,7 +219,10 @@ async function runMigrations() {
     await sqlClient`
       ALTER TABLE sales.quotes 
       ADD COLUMN IF NOT EXISTS brs_score NUMERIC(5,2),
-      ADD COLUMN IF NOT EXISTS current_approval_step INTEGER DEFAULT 1;
+      ADD COLUMN IF NOT EXISTS current_approval_step INTEGER DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS cost_total NUMERIC(14,2) DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS gross_margin_pct NUMERIC(5,2) DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS counter_discount_pct NUMERIC(5,2);
     `;
 
     // Quote Lines
@@ -231,10 +234,12 @@ async function runMigrations() {
         variant_id UUID REFERENCES sales.product_variants(id) ON DELETE SET NULL,
         quantity INTEGER NOT NULL CHECK (quantity > 0),
         unit_price NUMERIC(12,2) NOT NULL,
+        unit_cost NUMERIC(12,2) DEFAULT 0.00,
         discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0.00 CHECK (discount_pct BETWEEN 0 AND 100),
         applied_ceiling_pct NUMERIC(5,2),
         violation_score NUMERIC(8,4) DEFAULT 0.0000,
         line_total NUMERIC(14,2) NOT NULL,
+        gross_margin NUMERIC(14,2) DEFAULT 0.00,
         line_type sales.line_type NOT NULL DEFAULT 'one_time'
       );
     `;
@@ -242,8 +247,39 @@ async function runMigrations() {
     // Ensure columns exist on quote_lines if table already created
     await sqlClient`
       ALTER TABLE sales.quote_lines
+      ADD COLUMN IF NOT EXISTS unit_cost NUMERIC(12,2) DEFAULT 0.00,
       ADD COLUMN IF NOT EXISTS applied_ceiling_pct NUMERIC(5,2),
-      ADD COLUMN IF NOT EXISTS violation_score NUMERIC(8,4) DEFAULT 0.0000;
+      ADD COLUMN IF NOT EXISTS violation_score NUMERIC(8,4) DEFAULT 0.0000,
+      ADD COLUMN IF NOT EXISTS gross_margin NUMERIC(14,2) DEFAULT 0.00;
+    `;
+
+    // Line Comments (Discussion & Redlining)
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS sales.line_comments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_line_id UUID NOT NULL REFERENCES sales.quote_lines(id) ON DELETE CASCADE,
+        author_id UUID,
+        author_name VARCHAR(255) NOT NULL,
+        author_role VARCHAR(50) NOT NULL,
+        comment TEXT NOT NULL,
+        suggested_discount_pct NUMERIC(5,2),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `;
+
+    // Product Recommendations (Affinity & Cross-sell)
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS sales.product_recommendations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        source_product_id UUID NOT NULL REFERENCES sales.products(id) ON DELETE CASCADE,
+        recommended_product_id UUID NOT NULL REFERENCES sales.products(id) ON DELETE CASCADE,
+        relationship_type VARCHAR(50) NOT NULL DEFAULT 'cross_sell',
+        reason TEXT NOT NULL,
+        confidence_score NUMERIC(5,2) NOT NULL DEFAULT 0.85,
+        margin_boost_pct NUMERIC(5,2) DEFAULT 5.00,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT product_recommendations_uq UNIQUE (source_product_id, recommended_product_id)
+      );
     `;
 
     // Approvals
@@ -319,6 +355,21 @@ async function runMigrations() {
         email VARCHAR(320) NOT NULL,
         expires_at TIMESTAMPTZ NOT NULL,
         used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `;
+
+    // Portal Negotiation Sessions
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS portal.negotiation_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_id UUID NOT NULL,
+        session_token VARCHAR(128) NOT NULL UNIQUE,
+        participant_email VARCHAR(320) NOT NULL,
+        participant_name VARCHAR(255) NOT NULL,
+        participant_role VARCHAR(50) NOT NULL DEFAULT 'customer',
+        status VARCHAR(50) NOT NULL DEFAULT 'active',
+        last_active_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `;

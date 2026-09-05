@@ -1,5 +1,5 @@
 import { db, sqlClient } from '../client';
-import { users, customerTiers, products, priceLists, priceListItems, customers, discountCeilings } from '../schema/sales.schema';
+import { users, customerTiers, products, priceLists, priceListItems, customers, discountCeilings, productRecommendations } from '../schema/sales.schema';
 import * as bcrypt from 'bcryptjs';
 
 async function seed() {
@@ -419,6 +419,67 @@ async function seed() {
         });
     }
     console.log(`✅ ${ceilingData.length} discount ceilings seeded.`);
+
+    // 7. Seed Product Recommendations (Phase 3 Upsell / Cross-sell Intelligence)
+    console.log('Seeding product recommendations...');
+    const serverProduct = insertedProducts['HW-SRV-001'];
+    const upsProduct = insertedProducts['HW-UPS-3KVA'];
+    const slaProduct = insertedProducts['PS-SLA-PREM'];
+    const onboardingProduct = insertedProducts['PS-ONBOARD-01'];
+    const saasProProduct = insertedProducts['SAAS-PRO-YR'];
+    const saasAiProduct = insertedProducts['SAAS-AI-ADDON'];
+
+    if (serverProduct && upsProduct && slaProduct) {
+      const recs = [
+        {
+          sourceProductId: serverProduct,
+          recommendedProductId: upsProduct,
+          relationshipType: 'cross_sell',
+          reason: 'Servers require redundant rack power protection for high availability uptime SLA.',
+          confidenceScore: '0.95',
+          marginBoostPct: '8.00',
+        },
+        {
+          sourceProductId: serverProduct,
+          recommendedProductId: slaProduct,
+          relationshipType: 'upsell',
+          reason: 'Mission-critical server deployments include 24/7 dedicated escalation support.',
+          confidenceScore: '0.90',
+          marginBoostPct: '15.00',
+        },
+      ];
+      if (saasProProduct && saasAiProduct) {
+        recs.push({
+          sourceProductId: saasProProduct,
+          recommendedProductId: saasAiProduct,
+          relationshipType: 'cross_sell',
+          reason: 'Enterprise Pro accounts benefit from AI Quotation Copilot deal guidance.',
+          confidenceScore: '0.88',
+          marginBoostPct: '12.00',
+        });
+      }
+      if (saasProProduct && onboardingProduct) {
+        recs.push({
+          sourceProductId: saasProProduct,
+          recommendedProductId: onboardingProduct,
+          relationshipType: 'cross_sell',
+          reason: 'Enterprise SaaS deployment accelerator guarantees time-to-value within 4 weeks.',
+          confidenceScore: '0.92',
+          marginBoostPct: '10.00',
+        });
+      }
+
+      for (const r of recs) {
+        await db
+          .insert(productRecommendations)
+          .values(r)
+          .onConflictDoUpdate({
+            target: [productRecommendations.sourceProductId, productRecommendations.recommendedProductId],
+            set: { reason: r.reason, confidenceScore: r.confidenceScore, marginBoostPct: r.marginBoostPct },
+          });
+      }
+      console.log(`✅ ${recs.length} product recommendations seeded.`);
+    }
 
     console.log('🎉 Database seed completed successfully!');
   } catch (err) {
