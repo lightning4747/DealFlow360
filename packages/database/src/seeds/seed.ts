@@ -1,5 +1,6 @@
 import { db, sqlClient } from '../client';
 import { users, customerTiers, products, priceLists, priceListItems, customers, discountCeilings, productRecommendations } from '../schema/sales.schema';
+import { warehouses, warehouseStock } from '../schema/fulfillment.schema';
 import * as bcrypt from 'bcryptjs';
 
 async function seed() {
@@ -480,6 +481,88 @@ async function seed() {
       }
       console.log(`✅ ${recs.length} product recommendations seeded.`);
     }
+
+    // 8. Seed Regional Warehouses & Inventory Stock (Spatial Fulfillment)
+    console.log('Seeding regional warehouses...');
+    const warehouseData = [
+      {
+        code: 'WH-DAL-01',
+        name: 'South Central Distribution Hub (Dallas, TX)',
+        address: '1200 Logistics Way, Dallas, TX 75261',
+        latitude: '32.776700',
+        longitude: '-96.797000',
+        isActive: true,
+      },
+      {
+        code: 'WH-EWR-01',
+        name: 'Northeast Cargo Center (Newark, NJ)',
+        address: '500 Airport Rd, Newark, NJ 07114',
+        latitude: '40.735700',
+        longitude: '-74.172400',
+        isActive: true,
+      },
+      {
+        code: 'WH-SJC-01',
+        name: 'Silicon Valley Fulfillment Hub (San Jose, CA)',
+        address: '2500 Technology Dr, San Jose, CA 95110',
+        latitude: '37.338200',
+        longitude: '-121.886300',
+        isActive: true,
+      },
+      {
+        code: 'WH-ORD-01',
+        name: 'Midwest Regional Depot (Chicago, IL)',
+        address: '8800 Express Blvd, Chicago, IL 60666',
+        latitude: '41.878100',
+        longitude: '-87.629800',
+        isActive: true,
+      },
+    ];
+
+    const insertedWarehouses: Record<string, string> = {};
+    for (const wh of warehouseData) {
+      const [record] = await db
+        .insert(warehouses)
+        .values(wh)
+        .onConflictDoUpdate({
+          target: warehouses.code,
+          set: { name: wh.name, address: wh.address, latitude: wh.latitude, longitude: wh.longitude },
+        })
+        .returning();
+      insertedWarehouses[wh.code] = record.id;
+    }
+    console.log(`✅ ${Object.keys(insertedWarehouses).length} regional warehouses seeded.`);
+
+    // Seed stock across warehouses for Hardware SKUs
+    console.log('Seeding warehouse inventory stock...');
+    const allProducts = await db.select().from(products);
+    const hardwareProducts = allProducts.filter((p: any) => p.category === 'hardware');
+
+    for (const whCode of Object.keys(insertedWarehouses)) {
+      const whId = insertedWarehouses[whCode];
+      for (const hp of hardwareProducts) {
+        // Stock distribution varies per warehouse for realistic split testing
+        let initialQty = 50;
+        if (whCode === 'WH-DAL-01') initialQty = 30;
+        if (whCode === 'WH-EWR-01') initialQty = 25;
+        if (whCode === 'WH-SJC-01') initialQty = 40;
+        if (whCode === 'WH-ORD-01') initialQty = 20;
+
+        await db
+          .insert(warehouseStock)
+          .values({
+            warehouseId: whId,
+            productId: hp.id,
+            availableQty: initialQty,
+            reservedQty: 0,
+          })
+          .onConflictDoUpdate({
+            target: [warehouseStock.warehouseId, warehouseStock.productId],
+            set: { availableQty: initialQty },
+          });
+      }
+    }
+    console.log(`✅ Warehouse stock seeded across ${Object.keys(insertedWarehouses).length} hubs for ${hardwareProducts.length} hardware products.`);
 
     console.log('🎉 Database seed completed successfully!');
   } catch (err) {

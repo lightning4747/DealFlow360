@@ -410,6 +410,13 @@ async function runMigrations() {
       );
     `;
 
+    // Ensure delivery coordinates exist on customers
+    await sqlClient`
+      ALTER TABLE sales.customers
+      ADD COLUMN IF NOT EXISTS delivery_latitude NUMERIC(10,6),
+      ADD COLUMN IF NOT EXISTS delivery_longitude NUMERIC(10,6);
+    `;
+
     // Fulfillment Domain
     await sqlClient`
       CREATE TABLE IF NOT EXISTS fulfillment.warehouses (
@@ -428,11 +435,58 @@ async function runMigrations() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         warehouse_id UUID NOT NULL REFERENCES fulfillment.warehouses(id) ON DELETE CASCADE,
         product_id UUID NOT NULL,
-        available_qty INTEGER NOT NULL DEFAULT 0,
-        reserved_qty INTEGER NOT NULL DEFAULT 0,
+        available_qty INTEGER NOT NULL DEFAULT 0 CHECK (available_qty >= 0),
+        reserved_qty INTEGER NOT NULL DEFAULT 0 CHECK (reserved_qty >= 0),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         CONSTRAINT warehouse_stock_wh_prod_idx UNIQUE (warehouse_id, product_id)
       );
+    `;
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS fulfillment.fulfillment_splits (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_id UUID NOT NULL,
+        quote_line_id UUID,
+        product_id UUID NOT NULL,
+        warehouse_id UUID NOT NULL REFERENCES fulfillment.warehouses(id) ON DELETE CASCADE,
+        allocated_qty INTEGER NOT NULL DEFAULT 1,
+        shipping_cost NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        distance_km NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        carrier VARCHAR(100),
+        tracking_number VARCHAR(100),
+        estimated_delivery_days INTEGER DEFAULT 3,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `;
+    await sqlClient`
+      CREATE TABLE IF NOT EXISTS fulfillment.backorders (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_id UUID NOT NULL,
+        productId UUID NOT NULL,
+        requested_qty INTEGER NOT NULL,
+        allocated_qty INTEGER NOT NULL DEFAULT 0,
+        backorder_qty INTEGER NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'open',
+        estimated_restock_date TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `;
+
+    // PostGIS Distance Calculation Helper Function
+    await sqlClient`
+      CREATE OR REPLACE FUNCTION fulfillment.calculate_distance_km(
+        lat1 NUMERIC, lon1 NUMERIC,
+        lat2 NUMERIC, lon2 NUMERIC
+      ) RETURNS NUMERIC AS $$
+      BEGIN
+        IF lat1 IS NULL OR lon1 IS NULL OR lat2 IS NULL OR lon2 IS NULL THEN
+          RETURN 0.00;
+        END IF;
+        -- ST_DistanceSphere returns meters; divide by 1000 for kilometers
+        RETURN ROUND((ST_DistanceSphere(ST_MakePoint(lon1, lat1), ST_MakePoint(lon2, lat2)) / 1000.0)::numeric, 2);
+      END;
+      $$ LANGUAGE plpgsql IMMUTABLE;
     `;
 
     // Analytics Domain
