@@ -50,6 +50,9 @@ importers:
       bullmq:
         specifier: ^6.3.4
         version: 6.3.4(ioredis@5.11.1(supports-color@8.1.1))(pg@8.23.0)
+      date-fns:
+        specifier: ^4.4.0
+        version: 4.4.0
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
@@ -1568,6 +1571,9 @@ packages:
   d@1.0.2:
     resolution: {integrity: sha512-MOqHvMWF9/9MX6nza0KgvFH4HpMU0EF5uUDXqX/BtxtU8NfB0QzRtJ8Oe/6SuS4kbhyzVJwjd97EA4PKrzJ8bw==}
     engines: {node: '>=0.12'}
+
+  date-fns@4.4.0:
+    resolution: {integrity: sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w==}
 
   debug@2.6.9:
     resolution: {integrity: sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==}
@@ -4533,6 +4539,8 @@ snapshots:
     dependencies:
       es5-ext: 0.10.64
       type: 2.7.3
+
+  date-fns@4.4.0: {}
 
   debug@2.6.9(supports-color@8.1.1):
     dependencies:
