@@ -1,0 +1,399 @@
+import { db, sqlClient } from '../client';
+import { users, customerTiers, products, priceLists, priceListItems, customers } from '../schema/sales.schema';
+import * as bcrypt from 'bcryptjs';
+
+async function seed() {
+  console.log('🌱 Starting database seed...');
+
+  try {
+    // 1. Seed Customer Tiers
+    console.log('Seeding customer tiers...');
+    const tierData = [
+      {
+        name: 'Standard',
+        code: 'STD',
+        maxDiscountPct: '10.00',
+        approvalThresholdPct: '5.00',
+        description: 'Standard tier - baseline commercial terms (up to 10% discount)',
+      },
+      {
+        name: 'Silver',
+        code: 'SLV',
+        maxDiscountPct: '15.00',
+        approvalThresholdPct: '8.00',
+        description: 'Silver partner tier (up to 15% discount)',
+      },
+      {
+        name: 'Gold',
+        code: 'GLD',
+        maxDiscountPct: '25.00',
+        approvalThresholdPct: '15.00',
+        description: 'Gold enterprise tier (up to 25% discount)',
+      },
+      {
+        name: 'Platinum',
+        code: 'PLT',
+        maxDiscountPct: '35.00',
+        approvalThresholdPct: '20.00',
+        description: 'Platinum strategic account tier (up to 35% discount)',
+      },
+    ];
+
+    const insertedTiers: Record<string, string> = {};
+    for (const t of tierData) {
+      const [record] = await db
+        .insert(customerTiers)
+        .values(t)
+        .onConflictDoUpdate({
+          target: customerTiers.code,
+          set: {
+            maxDiscountPct: t.maxDiscountPct,
+            approvalThresholdPct: t.approvalThresholdPct,
+            description: t.description,
+          },
+        })
+        .returning();
+      insertedTiers[t.code] = record.id;
+    }
+    console.log(`✅ ${tierData.length} customer tiers seeded.`);
+
+    // 2. Seed Users
+    console.log('Seeding RBAC users...');
+    const passwordHash = await bcrypt.hash('password123', 10);
+    const userData = [
+      { email: 'admin@dealflow360.com', name: 'System Administrator', role: 'admin' as const },
+      { email: 'rep1@dealflow360.com', name: 'Alice Rep', role: 'sales_rep' as const },
+      { email: 'rep2@dealflow360.com', name: 'Bob Rep', role: 'sales_rep' as const },
+      { email: 'manager@dealflow360.com', name: 'Carol Manager', role: 'sales_manager' as const },
+      { email: 'finance@dealflow360.com', name: 'Dave Finance', role: 'finance' as const },
+    ];
+
+    const insertedUsers: Record<string, string> = {};
+    for (const u of userData) {
+      const [record] = await db
+        .insert(users)
+        .values({
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          hashedPassword: passwordHash,
+        })
+        .onConflictDoUpdate({
+          target: users.email,
+          set: { name: u.name, role: u.role, hashedPassword: passwordHash },
+        })
+        .returning();
+      insertedUsers[u.email] = record.id;
+    }
+    console.log(`✅ ${userData.length} users seeded.`);
+
+    // 3. Seed 20 Base Products
+    console.log('Seeding 20 products...');
+    const productData = [
+      // Hardware
+      {
+        sku: 'HW-SRV-001',
+        name: 'Enterprise Rack Server 1U (Dual Xeon 32C, 256GB RAM)',
+        category: 'hardware' as const,
+        basePrice: '4500.00',
+        unitCost: '3000.00',
+        unit: 'each',
+        taxRate: '0.0800',
+        description: '1U High-density compute node for virtualization',
+      },
+      {
+        sku: 'HW-SRV-002',
+        name: 'Enterprise Rack Server 2U (Dual EPYC 64C, 512GB RAM)',
+        category: 'hardware' as const,
+        basePrice: '8200.00',
+        unitCost: '5500.00',
+        unit: 'each',
+        taxRate: '0.0800',
+        description: '2U Scalable compute server with NVMe backplane',
+      },
+      {
+        sku: 'HW-SW-24P',
+        name: 'Managed Gigabit Switch 24-Port PoE+',
+        category: 'hardware' as const,
+        basePrice: '1200.00',
+        unitCost: '750.00',
+        unit: 'each',
+        taxRate: '0.0800',
+        description: 'L3 managed access switch with 4x 10G SFP+ uplinks',
+      },
+      {
+        sku: 'HW-SW-48P',
+        name: 'Enterprise PoE+ Switch 48-Port 10GbE',
+        category: 'hardware' as const,
+        basePrice: '2800.00',
+        unitCost: '1800.00',
+        unit: 'each',
+        taxRate: '0.0800',
+        description: 'High-bandwidth campus aggregation switch',
+      },
+      {
+        sku: 'HW-FW-10G',
+        name: 'NextGen Security Gateway 10Gbps',
+        category: 'hardware' as const,
+        basePrice: '6500.00',
+        unitCost: '4200.00',
+        unit: 'each',
+        taxRate: '0.0800',
+        description: 'Hardware firewall appliance with deep packet inspection',
+      },
+      {
+        sku: 'HW-SAN-50T',
+        name: 'Storage Area Network Array 50TB All-Flash',
+        category: 'hardware' as const,
+        basePrice: '14000.00',
+        unitCost: '9500.00',
+        unit: 'each',
+        taxRate: '0.0800',
+        description: 'Redundant dual-controller active-active NVMe array',
+      },
+      {
+        sku: 'HW-UPS-3KVA',
+        name: 'Online Rackmount Smart-UPS 3kVA',
+        category: 'hardware' as const,
+        basePrice: '1850.00',
+        unitCost: '1100.00',
+        unit: 'each',
+        taxRate: '0.0800',
+        description: 'Zero-transfer time double-conversion battery backup',
+      },
+      // SaaS Subscriptions
+      {
+        sku: 'SAAS-CORE-MO',
+        name: 'DealFlow360 Core Platform Monthly',
+        category: 'subscription' as const,
+        basePrice: '99.00',
+        unitCost: '15.00',
+        unit: 'seat/month',
+        taxRate: '0.0000',
+        description: 'Standard SaaS license billed per active user monthly',
+      },
+      {
+        sku: 'SAAS-CORE-YR',
+        name: 'DealFlow360 Core Platform Annual',
+        category: 'subscription' as const,
+        basePrice: '990.00',
+        unitCost: '150.00',
+        unit: 'seat/year',
+        taxRate: '0.0000',
+        description: 'Annual commit license per user with 2 months free equivalent',
+      },
+      {
+        sku: 'SAAS-PRO-MO',
+        name: 'DealFlow360 Enterprise Pro Monthly',
+        category: 'subscription' as const,
+        basePrice: '199.00',
+        unitCost: '25.00',
+        unit: 'seat/month',
+        taxRate: '0.0000',
+        description: 'Pro tier including unlimited approval hierarchies & Kafka feeds',
+      },
+      {
+        sku: 'SAAS-PRO-YR',
+        name: 'DealFlow360 Enterprise Pro Annual',
+        category: 'subscription' as const,
+        basePrice: '1990.00',
+        unitCost: '250.00',
+        unit: 'seat/year',
+        taxRate: '0.0000',
+        description: 'Annual enterprise commit with dedicated customer success engineer',
+      },
+      {
+        sku: 'SAAS-AI-ADDON',
+        name: 'AI Quotation & Copilot Addon',
+        category: 'subscription' as const,
+        basePrice: '49.00',
+        unitCost: '8.00',
+        unit: 'user/month',
+        taxRate: '0.0000',
+        description: 'Automated deal intelligence and pricing recommendation assistant',
+      },
+      {
+        sku: 'SAAS-AUDIT-COMP',
+        name: 'Advanced Compliance & Immutable Audit Retention',
+        category: 'subscription' as const,
+        basePrice: '299.00',
+        unitCost: '30.00',
+        unit: 'tenant/month',
+        taxRate: '0.0000',
+        description: '7-year WORM compliance retention and cryptographic chain verification',
+      },
+      {
+        sku: 'SAAS-API-BURST',
+        name: 'High-Throughput API Gateway Tier',
+        category: 'subscription' as const,
+        basePrice: '450.00',
+        unitCost: '50.00',
+        unit: 'tenant/month',
+        taxRate: '0.0000',
+        description: '10,000 req/min rate limit allocation on Kong gateway',
+      },
+      // Professional Services
+      {
+        sku: 'PS-ONBOARD-01',
+        name: 'Standard Enterprise Onboarding Package',
+        category: 'services' as const,
+        basePrice: '5000.00',
+        unitCost: '2500.00',
+        unit: 'package',
+        taxRate: '0.0000',
+        description: '4-week guided installation, catalog ingestion, and RBAC rollout',
+      },
+      {
+        sku: 'PS-ARCH-CONS',
+        name: 'Principal Solutions Architect Consulting (Per Day)',
+        category: 'services' as const,
+        basePrice: '2400.00',
+        unitCost: '1200.00',
+        unit: 'day',
+        taxRate: '0.0000',
+        description: 'Dedicated solution architect for custom pipeline architecture',
+      },
+      {
+        sku: 'PS-DATA-MIGR',
+        name: 'Legacy CRM & Billing Data Migration Service',
+        category: 'services' as const,
+        basePrice: '8500.00',
+        unitCost: '4000.00',
+        unit: 'engagement',
+        taxRate: '0.0000',
+        description: 'Full historical quote, customer, and contract extraction & validation',
+      },
+      {
+        sku: 'PS-TRAIN-WKS',
+        name: 'Sales Rep & Operations Training Workshop',
+        category: 'services' as const,
+        basePrice: '3500.00',
+        unitCost: '1500.00',
+        unit: 'session',
+        taxRate: '0.0000',
+        description: 'Live interactive training session with role-based certification',
+      },
+      {
+        sku: 'PS-CUSTOM-INT',
+        name: 'Custom ERP / Billing Integration Engagement',
+        category: 'services' as const,
+        basePrice: '12000.00',
+        unitCost: '6500.00',
+        unit: 'project',
+        taxRate: '0.0000',
+        description: 'Bespoke webhook/Kafka connector built to ERP endpoints',
+      },
+      {
+        sku: 'PS-SLA-PREM',
+        name: '24/7 Premium Mission-Critical Support SLA',
+        category: 'services' as const,
+        basePrice: '1500.00',
+        unitCost: '600.00',
+        unit: 'month',
+        taxRate: '0.0000',
+        description: '15-minute response time SLA with dedicated escalation hotline',
+      },
+    ];
+
+    const insertedProducts: Record<string, string> = {};
+    for (const p of productData) {
+      const [record] = await db
+        .insert(products)
+        .values(p)
+        .onConflictDoUpdate({
+          target: products.sku,
+          set: {
+            name: p.name,
+            category: p.category,
+            basePrice: p.basePrice,
+            unitCost: p.unitCost,
+            unit: p.unit,
+            description: p.description,
+          },
+        })
+        .returning();
+      insertedProducts[p.sku] = record.id;
+    }
+    console.log(`✅ ${productData.length} products seeded.`);
+
+    // 4. Seed Price Lists & Overrides
+    console.log('Seeding Price Lists...');
+    const [goldPriceList] = await db
+      .insert(priceLists)
+      .values({
+        name: 'Gold Enterprise Preferred Pricing',
+        tierId: insertedTiers['GLD'],
+      })
+      .returning();
+
+    // Add item overrides for Gold tier
+    await db
+      .insert(priceListItems)
+      .values([
+        {
+          priceListId: goldPriceList.id,
+          productId: insertedProducts['HW-SRV-001'],
+          price: '3825.00', // 15% discount
+        },
+        {
+          priceListId: goldPriceList.id,
+          productId: insertedProducts['SAAS-PRO-YR'],
+          price: '1592.00', // 20% discount
+        },
+      ])
+      .onConflictDoNothing();
+    console.log('✅ Price Lists and overrides seeded.');
+
+    // 5. Seed Enterprise Customers
+    console.log('Seeding enterprise accounts...');
+    const customerData = [
+      {
+        name: 'Acme Corporation',
+        email: 'procurement@acme.com',
+        company: 'Acme Industrial Corp',
+        tier: 'gold' as const,
+        tierId: insertedTiers['GLD'],
+        creditLimit: '500000.00',
+        location: 'San Francisco, CA',
+      },
+      {
+        name: 'Globex Systems',
+        email: 'purchasing@globex.com',
+        company: 'Globex Corporation',
+        tier: 'silver' as const,
+        tierId: insertedTiers['SLV'],
+        creditLimit: '250000.00',
+        location: 'Austin, TX',
+      },
+      {
+        name: 'Initech Software',
+        email: 'billing@initech.com',
+        company: 'Initech LLC',
+        tier: 'bronze' as const,
+        tierId: insertedTiers['STD'],
+        creditLimit: '50000.00',
+        location: 'Dallas, TX',
+      },
+    ];
+
+    for (const c of customerData) {
+      await db
+        .insert(customers)
+        .values(c)
+        .onConflictDoUpdate({
+          target: customers.email,
+          set: { name: c.name, company: c.company, tier: c.tier, creditLimit: c.creditLimit },
+        });
+    }
+    console.log(`✅ ${customerData.length} customers seeded.`);
+
+    console.log('🎉 Database seed completed successfully!');
+  } catch (err) {
+    console.error('❌ Database seed error:', err);
+    process.exit(1);
+  } finally {
+    await sqlClient.end();
+  }
+}
+
+seed();
