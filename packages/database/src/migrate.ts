@@ -26,7 +26,12 @@ async function runMigrations() {
     // Enums in sales schema
     await sqlClient`
       DO $$ BEGIN
-        CREATE TYPE sales.user_role AS ENUM ('admin', 'sales_rep', 'sales_manager', 'finance');
+        CREATE TYPE sales.user_role AS ENUM ('admin', 'sales_rep', 'sales_manager', 'finance', 'customer');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+      DO $$ BEGIN
+        ALTER TYPE sales.user_role ADD VALUE IF NOT EXISTS 'customer';
       EXCEPTION
         WHEN duplicate_object THEN null;
       END $$;

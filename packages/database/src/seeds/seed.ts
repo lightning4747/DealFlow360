@@ -67,6 +67,11 @@ async function seed() {
       { email: 'rep2@dealflow360.com', name: 'Bob Rep', role: 'sales_rep' as const },
       { email: 'manager@dealflow360.com', name: 'Carol Manager', role: 'sales_manager' as const },
       { email: 'finance@dealflow360.com', name: 'Dave Finance', role: 'finance' as const },
+      { email: 'procurement@acme.com', name: 'Sarah Connor (Acme Corp)', role: 'customer' as const },
+      { email: 'purchasing@globex.com', name: 'Hank Scorpio (Globex)', role: 'customer' as const },
+      { email: 'billing@initech.com', name: 'Peter Gibbons (Initech)', role: 'customer' as const },
+      { email: 'ops@apexlogistics.com', name: 'Elena Rostova (Apex Logistics)', role: 'customer' as const },
+      { email: 'it-purchasing@nexushealth.org', name: 'Marcus Vance (Nexus Health)', role: 'customer' as const },
     ];
 
     const insertedUsers: Record<string, string> = {};
@@ -356,6 +361,8 @@ async function seed() {
         tierId: insertedTiers['GLD'],
         creditLimit: '500000.00',
         location: 'San Francisco, CA',
+        deliveryLatitude: '37.774900',
+        deliveryLongitude: '-122.419400',
       },
       {
         name: 'Globex Systems',
@@ -365,6 +372,8 @@ async function seed() {
         tierId: insertedTiers['SLV'],
         creditLimit: '250000.00',
         location: 'Austin, TX',
+        deliveryLatitude: '30.267200',
+        deliveryLongitude: '-97.743100',
       },
       {
         name: 'Initech Software',
@@ -374,6 +383,85 @@ async function seed() {
         tierId: insertedTiers['STD'],
         creditLimit: '50000.00',
         location: 'Dallas, TX',
+        deliveryLatitude: '32.776700',
+        deliveryLongitude: '-96.797000',
+      },
+      {
+        name: 'Apex Logistics Global',
+        email: 'ops@apexlogistics.com',
+        company: 'Apex Logistics International Inc.',
+        tier: 'platinum' as const,
+        tierId: insertedTiers['PLT'],
+        creditLimit: '1200000.00',
+        location: 'Chicago, IL',
+        deliveryLatitude: '41.878100',
+        deliveryLongitude: '-87.629800',
+      },
+      {
+        name: 'Nexus Health Systems',
+        email: 'it-purchasing@nexushealth.org',
+        company: 'Nexus Healthcare Alliance',
+        tier: 'platinum' as const,
+        tierId: insertedTiers['PLT'],
+        creditLimit: '950000.00',
+        location: 'New York, NY',
+        deliveryLatitude: '40.712800',
+        deliveryLongitude: '-74.006000',
+      },
+      {
+        name: 'Cyberdyne Quantum AI',
+        email: 'supply@cyberdyne-quantum.io',
+        company: 'Cyberdyne Quantum Labs',
+        tier: 'gold' as const,
+        tierId: insertedTiers['GLD'],
+        creditLimit: '750000.00',
+        location: 'San Jose, CA',
+        deliveryLatitude: '37.338200',
+        deliveryLongitude: '-121.886300',
+      },
+      {
+        name: 'Vanguard FinTech',
+        email: 'infrastructure@vanguardfin.com',
+        company: 'Vanguard Financial Technologies Ltd',
+        tier: 'gold' as const,
+        tierId: insertedTiers['GLD'],
+        creditLimit: '600000.00',
+        location: 'Newark, NJ',
+        deliveryLatitude: '40.735700',
+        deliveryLongitude: '-74.172400',
+      },
+      {
+        name: 'Starlight Media Studios',
+        email: 'tech@starlightstudios.com',
+        company: 'Starlight Media & Broadcast',
+        tier: 'silver' as const,
+        tierId: insertedTiers['SLV'],
+        creditLimit: '200000.00',
+        location: 'Los Angeles, CA',
+        deliveryLatitude: '34.052200',
+        deliveryLongitude: '-118.243700',
+      },
+      {
+        name: 'Hooli Cloud Computing',
+        email: 'hardware-ops@hooli.com',
+        company: 'Hooli Enterprises',
+        tier: 'platinum' as const,
+        tierId: insertedTiers['PLT'],
+        creditLimit: '2000000.00',
+        location: 'Seattle, WA',
+        deliveryLatitude: '47.606200',
+        deliveryLongitude: '-122.332100',
+      },
+      {
+        name: 'Pied Piper Data',
+        email: 'richard@piedpiper.com',
+        company: 'Pied Piper Compression Technologies',
+        tier: 'bronze' as const,
+        tierId: insertedTiers['STD'],
+        creditLimit: '80000.00',
+        location: 'Palo Alto, CA',
+        deliveryLatitude: '37.441900',
+        deliveryLongitude: '-122.143000',
       },
     ];
 
@@ -383,9 +471,19 @@ async function seed() {
         .values(c)
         .onConflictDoUpdate({
           target: customers.email,
-          set: { name: c.name, company: c.company, tier: c.tier, creditLimit: c.creditLimit },
+          set: {
+            name: c.name,
+            company: c.company,
+            tier: c.tier,
+            tierId: c.tierId,
+            creditLimit: c.creditLimit,
+            location: c.location,
+            deliveryLatitude: c.deliveryLatitude,
+            deliveryLongitude: c.deliveryLongitude,
+          },
         });
     }
+    console.log(`✅ ${customerData.length} enterprise accounts seeded.`);
     // 6. Seed Discount Ceilings (Phase 2 Governance)
     console.log('Seeding discount ceilings...');
     const ceilingData = [
