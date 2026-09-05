@@ -276,6 +276,9 @@ export const quotes = salesSchema.table(
     brsScore: numeric('brs_score', { precision: 5, scale: 2 }),
     currentApprovalStep: integer('current_approval_step').default(1),
     totalAmount: numeric('total_amount', { precision: 14, scale: 2 }).notNull().default('0.00'),
+    costTotal: numeric('cost_total', { precision: 14, scale: 2 }).default('0.00'),
+    grossMarginPct: numeric('gross_margin_pct', { precision: 5, scale: 2 }).default('0.00'),
+    counterDiscountPct: numeric('counter_discount_pct', { precision: 5, scale: 2 }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().default(sql`now()`),
@@ -302,10 +305,12 @@ export const quoteLines = salesSchema.table(
     variantId: uuid('variant_id').references(() => productVariants.id, { onDelete: 'set null' }),
     quantity: integer('quantity').notNull(),
     unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).notNull(),
+    unitCost: numeric('unit_cost', { precision: 12, scale: 2 }).default('0.00'),
     discountPct: numeric('discount_pct', { precision: 5, scale: 2 }).notNull().default('0.00'),
     appliedCeilingPct: numeric('applied_ceiling_pct', { precision: 5, scale: 2 }),
     violationScore: numeric('violation_score', { precision: 8, scale: 4 }).default('0.0000'),
     lineTotal: numeric('line_total', { precision: 14, scale: 2 }).notNull(),
+    grossMargin: numeric('gross_margin', { precision: 14, scale: 2 }).default('0.00'),
     lineType: lineTypeEnum('line_type').notNull().default('one_time'),
   },
   (table) => ({
@@ -393,3 +398,50 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 export type NewAuditLog = typeof auditLogs.$inferInsert;
 export const insertAuditLogSchema = createInsertSchema(auditLogs);
 export const selectAuditLogSchema = createSelectSchema(auditLogs);
+
+// ─── line_comments (Redlining / Discussion) ──────────────────────────────────
+export const lineComments = salesSchema.table(
+  'line_comments',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    quoteLineId: uuid('quote_line_id').notNull().references(() => quoteLines.id, { onDelete: 'cascade' }),
+    authorId: uuid('author_id'),
+    authorName: varchar('author_name', { length: 255 }).notNull(),
+    authorRole: varchar('author_role', { length: 50 }).notNull(),
+    comment: text('comment').notNull(),
+    suggestedDiscountPct: numeric('suggested_discount_pct', { precision: 5, scale: 2 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (table) => ({
+    lineIdx: index('line_comments_line_idx').on(table.quoteLineId),
+  }),
+);
+
+export type LineComment = typeof lineComments.$inferSelect;
+export type NewLineComment = typeof lineComments.$inferInsert;
+export const insertLineCommentSchema = createInsertSchema(lineComments);
+export const selectLineCommentSchema = createSelectSchema(lineComments);
+
+// ─── product_recommendations (Upsell & Cross-sell Intelligence) ──────────────
+export const productRecommendations = salesSchema.table(
+  'product_recommendations',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    sourceProductId: uuid('source_product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+    recommendedProductId: uuid('recommended_product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+    relationshipType: varchar('relationship_type', { length: 50 }).notNull().default('cross_sell'), // cross_sell, upsell, upgrade
+    reason: text('reason').notNull(),
+    confidenceScore: numeric('confidence_score', { precision: 5, scale: 2 }).notNull().default('0.85'),
+    marginBoostPct: numeric('margin_boost_pct', { precision: 5, scale: 2 }).default('5.00'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (table) => ({
+    sourceIdx: index('product_recommendations_src_idx').on(table.sourceProductId),
+    recUnique: uniqueIndex('product_recommendations_uq').on(table.sourceProductId, table.recommendedProductId),
+  }),
+);
+
+export type ProductRecommendation = typeof productRecommendations.$inferSelect;
+export type NewProductRecommendation = typeof productRecommendations.$inferInsert;
+export const insertProductRecommendationSchema = createInsertSchema(productRecommendations);
+export const selectProductRecommendationSchema = createSelectSchema(productRecommendations);
