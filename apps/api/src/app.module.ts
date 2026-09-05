@@ -14,6 +14,7 @@ import { FulfillmentModule } from './modules/fulfillment/fulfillment.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { HealthModule } from './modules/health/health.module';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
 
 @Module({
@@ -29,6 +30,7 @@ import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
     BillingModule,
     AnalyticsModule,
     PaymentsModule,
+    HealthModule,
     AuthModule,
     ProductsModule,
     CustomerTiersModule,
