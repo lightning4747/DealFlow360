@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus, Inject } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Inject } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Public } from './decorators/auth.decorator';
 import { LoginRequestSchema, SignupRequestSchema, MagicLinkRequestSchema, MagicLinkVerifySchema } from '@dealflow360/types';
@@ -11,25 +11,7 @@ export class AuthController {
   @Post(['internal/auth/login', 'auth/login'])
   @HttpCode(HttpStatus.OK)
   async loginPost(@Body() body: any) {
-    const email = body?.email || 'manager@dealflow360.com';
-    const password = body?.password || 'password123';
-    const credentials = LoginRequestSchema.parse({ email, password });
-    const result = await this.authService.login(credentials);
-    return {
-      data: result,
-      meta: { timestamp: new Date().toISOString() },
-      error: null,
-    };
-  }
-
-  @Public()
-  @Get(['internal/auth/login', 'auth/login'])
-  @HttpCode(HttpStatus.OK)
-  async loginGet() {
-    const credentials = LoginRequestSchema.parse({
-      email: 'manager@dealflow360.com',
-      password: 'password123',
-    });
+    const credentials = LoginRequestSchema.parse(body);
     const result = await this.authService.login(credentials);
     return {
       data: result,
