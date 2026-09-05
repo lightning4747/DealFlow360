@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -53,12 +54,14 @@ interface ApprovalDetails {
     brsScore: string;
     approvalLevel: string;
     status: string;
+    currentApprovalStep?: number;
   };
   quote: {
     id: string;
     quoteNumber: string;
     totalAmount: string;
     status: string;
+    currentApprovalStep?: number;
   };
   customer?: {
     name: string;
@@ -86,6 +89,7 @@ interface ApprovalDetails {
 }
 
 export default function ApprovalsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'pending' | 'team' | 'history'>('pending');
   const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,10 +103,15 @@ export default function ApprovalsPage() {
       const stored = localStorage.getItem('currentUser');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.role) setUserRole(parsed.role);
+        if (parsed.role) {
+          setUserRole(parsed.role);
+          if (parsed.role === 'customer') {
+            router.push('/customer/orders');
+          }
+        }
       }
     } catch {}
-  }, []);
+  }, [router]);
 
   // Decision Modal
   const [decisionType, setDecisionType] = useState<'approved' | 'rejected' | null>(null);
@@ -163,11 +172,19 @@ export default function ApprovalsPage() {
       });
       if (!res.ok) throw new Error(`Failed to load approvals (${res.status})`);
       const data = await res.json();
-      setApprovals(Array.isArray(data) ? data : data.data || []);
+      const rawList = Array.isArray(data) ? data : data.data || [];
+      // Compute canAct accurately based on current active user role and active step
+      const mapped = rawList.map((app: any) => ({
+        ...app,
+        canAct:
+          userRole === 'admin' ||
+          (app.activeStep && app.activeStep.roleRequired === userRole),
+      }));
+      setApprovals(mapped);
     } catch (err: any) {
       console.warn('API fetch note (demo mock fallback):', err.message);
       // Demo mock data if API is starting or in dev sandbox
-      setApprovals([
+      const mockList = [
         {
           id: 'appr-001',
           quoteId: 'qte-101',
@@ -178,7 +195,7 @@ export default function ApprovalsPage() {
           status: 'pending',
           currentApprovalStep: 1,
           createdAt: new Date().toISOString(),
-          canAct: true,
+          canAct: userRole === 'admin' || userRole === 'sales_manager',
           activeStep: { id: 'step-1', stepOrder: 1, roleRequired: 'sales_manager' },
           steps: [
             { id: 'step-1', stepOrder: 1, roleRequired: 'sales_manager', decision: 'pending' },
@@ -195,14 +212,15 @@ export default function ApprovalsPage() {
           status: 'pending',
           currentApprovalStep: 1,
           createdAt: new Date(Date.now() - 3600000).toISOString(),
-          canAct: true,
+          canAct: userRole === 'admin' || userRole === 'sales_manager',
           activeStep: { id: 'step-11', stepOrder: 1, roleRequired: 'sales_manager' },
           steps: [
             { id: 'step-11', stepOrder: 1, roleRequired: 'sales_manager', decision: 'pending' },
             { id: 'step-12', stepOrder: 2, roleRequired: 'finance', decision: 'pending' },
           ],
         },
-      ]);
+      ];
+      setApprovals(mockList as any);
     } finally {
       setLoading(false);
     }
@@ -210,7 +228,7 @@ export default function ApprovalsPage() {
 
   useEffect(() => {
     fetchApprovals();
-  }, []);
+  }, [userRole]);
 
   const openReviewDrawer = async (approvalId: string) => {
     setSelectedApprovalId(approvalId);
@@ -239,12 +257,14 @@ export default function ApprovalsPage() {
           brsScore: selected?.brsScore || '34.41',
           approvalLevel: selected?.approvalLevel || 'level_2',
           status: selected?.status || 'pending',
+          currentApprovalStep: selected?.currentApprovalStep || 1,
         },
         quote: {
           id: selected?.quoteId || 'qte-001',
           quoteNumber: selected?.quoteNumber || 'QTE-2026-0814',
           totalAmount: selected?.totalAmount || '145000.00',
           status: 'pending_approval',
+          currentApprovalStep: selected?.currentApprovalStep || 1,
         },
         customer: {
           name: 'Acme Global Industries',
@@ -437,34 +457,52 @@ export default function ApprovalsPage() {
 
         {/* Approvals Table */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden shadow-xl backdrop-blur-sm">
-          {loading ? (
-            <div className="p-12 text-center text-slate-400">Loading pending governance queue...</div>
-          ) : approvals.length === 0 ? (
-            <div className="p-12 text-center">
-              <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3 opacity-60" />
-              <h3 className="text-base font-semibold text-white">All Clear! No Pending Approvals</h3>
-              <p className="text-sm text-slate-400 mt-1">
-                Quotes with BRS = 0 have been automatically approved and sent.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400 font-medium text-xs uppercase tracking-wider">
-                    <th className="py-3.5 px-6">Quote Number</th>
-                    <th className="py-3.5 px-6">Deal Value</th>
-                    <th className="py-3.5 px-6">Blended Risk Score</th>
-                    <th className="py-3.5 px-6">Required Authority</th>
-                    <th className="py-3.5 px-6">Status</th>
-                    <th className="py-3.5 px-6 text-right">Review Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {approvals.map((item) => {
-                    const score = parseFloat(item.brsScore || '0');
-                    return (
-                      <tr key={item.id} className="hover:bg-slate-800/30 transition">
+          {(() => {
+            const displayedApprovals =
+              activeTab === 'pending'
+                ? approvals.filter((a) => a.canAct && a.status === 'pending')
+                : approvals;
+
+            if (loading) {
+              return <div className="p-12 text-center text-slate-400">Loading pending governance queue...</div>;
+            }
+
+            if (displayedApprovals.length === 0) {
+              return (
+                <div className="p-12 text-center">
+                  <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3 opacity-60" />
+                  <h3 className="text-base font-semibold text-white">
+                    {activeTab === 'pending'
+                      ? 'No Approvals Awaiting Your Action'
+                      : 'All Clear! No Pending Approvals'}
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto">
+                    {activeTab === 'pending'
+                      ? 'You have no quotes currently pending your sign-off step. Switch to "Assigned to Team" to view quotes awaiting other workflow steps.'
+                      : 'Quotes with BRS = 0 have been automatically approved and sent.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400 font-medium text-xs uppercase tracking-wider">
+                      <th className="py-3.5 px-6">Quote Number</th>
+                      <th className="py-3.5 px-6">Deal Value</th>
+                      <th className="py-3.5 px-6">Blended Risk Score</th>
+                      <th className="py-3.5 px-6">Required Authority</th>
+                      <th className="py-3.5 px-6">Status</th>
+                      <th className="py-3.5 px-6 text-right">Review Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {displayedApprovals.map((item) => {
+                      const score = parseFloat(item.brsScore || '0');
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-800/30 transition">
                         <td className="py-4 px-6 font-semibold text-white">
                           <div className="flex items-center gap-2">
                             <FileText className="w-4 h-4 text-slate-400" />
@@ -503,7 +541,8 @@ export default function ApprovalsPage() {
                 </tbody>
               </table>
             </div>
-          )}
+          );
+        })()}
         </div>
       </div>
 
@@ -591,6 +630,62 @@ export default function ApprovalsPage() {
               </table>
             </div>
 
+            {/* Workflow Steps Progression */}
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">
+              Governance Workflow Steps
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+              {details.steps.map((step) => {
+                const isCurrent = step.stepOrder === details.approval.currentApprovalStep;
+                const isPassed = step.decision === 'approved';
+                const isRejected = step.decision === 'rejected';
+
+                return (
+                  <div
+                    key={step.id}
+                    className={`p-3.5 rounded-xl border flex items-center justify-between ${
+                      isCurrent
+                        ? 'bg-indigo-950/30 border-indigo-500/50'
+                        : isPassed
+                          ? 'bg-emerald-950/20 border-emerald-500/30'
+                          : 'bg-slate-950/40 border-slate-800'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase text-slate-300">
+                          Step {step.stepOrder}: {step.roleRequired.replace('_', ' ')}
+                        </span>
+                        {isCurrent && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 uppercase border border-indigo-500/30 animate-pulse">
+                            Current Stage
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Required Role: <span className="text-slate-300 font-mono">{step.roleRequired}</span>
+                      </p>
+                    </div>
+                    <div>
+                      {isPassed ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
+                          Approved
+                        </span>
+                      ) : isRejected ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase">
+                          Rejected
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase">
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             {/* Decision Action Box */}
             {decisionType ? (
               <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 mb-4">
@@ -645,28 +740,49 @@ export default function ApprovalsPage() {
                     ${parseFloat(details.quote.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                {['admin', 'sales_manager', 'finance'].includes(userRole) ? (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setDecisionType('rejected')}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold transition"
-                    >
-                      <XCircle className="w-4 h-4" />
-                      Reject Deal
-                    </button>
-                    <button
-                      onClick={() => setDecisionType('approved')}
-                      className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-md"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      Approve Deal
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-xs text-amber-400/90 font-medium px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                    Read-Only Audit Mode: Only authorized Sales Managers & Finance Approvers can decide deals.
-                  </div>
-                )}
+                {(() => {
+                  const activeStepObj = details.steps.find(
+                    (s) => s.stepOrder === details.approval.currentApprovalStep
+                  );
+                  const isCurrentRoleTurn =
+                    userRole === 'admin' ||
+                    (activeStepObj && activeStepObj.roleRequired === userRole);
+
+                  if (isCurrentRoleTurn) {
+                    return (
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setDecisionType('rejected')}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold transition"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Reject Deal
+                        </button>
+                        <button
+                          onClick={() => setDecisionType('approved')}
+                          className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-md"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Approve Deal
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (userRole === 'sales_rep') {
+                    return (
+                      <div className="text-xs text-slate-400 font-medium px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg">
+                        Read-Only View: Submitted by sales rep. Awaiting {activeStepObj?.roleRequired.replace('_', ' ').toUpperCase()} sign-off.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="text-xs text-amber-400/90 font-medium px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                      Awaiting Stage {activeStepObj?.stepOrder}: {activeStepObj?.roleRequired.replace('_', ' ').toUpperCase()} review before your stage.
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

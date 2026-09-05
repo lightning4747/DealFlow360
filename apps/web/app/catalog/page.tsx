@@ -94,13 +94,13 @@ export default function CatalogPage() {
         </div>
 
         <div className="flex items-center space-x-3">
-          {(userRole === 'admin' || userRole === 'sales_manager' || userRole === 'finance') && (
+          {(userRole === 'admin' || userRole === 'sales_manager' || userRole === 'finance' || userRole === 'sales_rep') && (
             <Link
               href="/approvals"
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition"
             >
               <Shield className="h-3.5 w-3.5 text-indigo-400" />
-              <span>Approvals Queue</span>
+              <span>Governance Queue</span>
             </Link>
           )}
           {userRole === 'admin' && (
