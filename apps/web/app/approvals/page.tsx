@@ -1,57 +1,43 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { AppShell } from '@/components/workspace/app-shell';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AppHeader } from '@/components/app-header';
 
-interface ApprovalItem {
+interface ApprovalRow {
   id: string;
   quoteId: string;
-  quoteNumber: string;
-  customerName: string;
-  totalAmount: string;
-  brsScore: string;
-  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
-  assignedTo: string;
+  customer: string;
+  blendedRisk: 'HIGH' | 'MEDIUM' | 'LOW';
   stage: string;
-  status: 'pending' | 'approved' | 'returned';
+  assignedTo: string;
+  status: 'pending' | 'returned' | 'approved';
 }
 
-const MOCK_APPROVALS: ApprovalItem[] = [
+const ROWS: ApprovalRow[] = [
   {
-    id: 'appr-1',
+    id: '1',
     quoteId: 'Q-1042',
-    quoteNumber: 'Q-1042',
-    customerName: 'Acme Corp',
-    totalAmount: '$2,750',
-    brsScore: 'HIGH',
-    riskLevel: 'HIGH',
+    customer: 'Acme Corp',
+    blendedRisk: 'HIGH',
     stage: 'Sales Manager',
     assignedTo: 'M. Shah',
     status: 'pending',
   },
   {
-    id: 'appr-2',
+    id: '2',
     quoteId: 'Q-1039',
-    quoteNumber: 'Q-1039',
-    customerName: 'Beta Industries',
-    totalAmount: '$950',
-    brsScore: 'MEDIUM',
-    riskLevel: 'MEDIUM',
+    customer: 'Beta Industries',
+    blendedRisk: 'MEDIUM',
     stage: 'Finance',
     assignedTo: 'R. Iyer',
     status: 'pending',
   },
   {
-    id: 'appr-3',
+    id: '3',
     quoteId: 'Q-1035',
-    quoteNumber: 'Q-1035',
-    customerName: 'Nova Retail',
-    totalAmount: '$5,750',
-    brsScore: 'LOW',
-    riskLevel: 'LOW',
+    customer: 'Nova Retail',
+    blendedRisk: 'LOW',
     stage: 'Auto Approved',
     assignedTo: 'Auto Approved',
     status: 'approved',
@@ -61,117 +47,87 @@ const MOCK_APPROVALS: ApprovalItem[] = [
 export default function ApprovalsPage() {
   const [filter, setFilter] = useState<'pending' | 'returned' | 'approved'>('pending');
 
-  const filteredApprovals = MOCK_APPROVALS.filter((item) => {
-    if (filter === 'pending') return item.status === 'pending';
-    if (filter === 'returned') return item.status === 'returned';
-    if (filter === 'approved') return item.status === 'approved';
-    return true;
-  });
+  const filtered = ROWS.filter((r) => r.status === filter);
 
   return (
-    <AppShell
-      headerTitle="Approvals (List)"
-      headerSubtitle="Every quotation that exceeded limits, or is going through discount approval"
-    >
-      <div className="space-y-6">
-        {/* Urgent Triage Filter Badges strictly matching Screen 5 in PNG */}
+    <div className="min-h-screen bg-black text-white">
+      <AppHeader />
+      <main className="max-w-6xl mx-auto p-8 space-y-6">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-white">Approvals (List)</h1>
+          <p className="text-xs text-gray-400 mt-1">
+            Every quotation that exceeded limits, or is going through discount approval
+          </p>
+        </div>
+
+        {/* Triage Pills from PNG Screen 5 */}
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setFilter('pending')}
-            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+            className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${
               filter === 'pending'
-                ? 'bg-neutral-100 text-neutral-900 border-neutral-100 font-semibold'
-                : 'bg-neutral-900/60 text-neutral-400 border-neutral-800 hover:text-white'
+                ? 'bg-white text-black border-white font-semibold'
+                : 'bg-transparent text-gray-400 border-[#333] hover:text-white'
             }`}
           >
             3 Pending
           </button>
           <button
             onClick={() => setFilter('returned')}
-            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+            className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${
               filter === 'returned'
-                ? 'bg-neutral-100 text-neutral-900 border-neutral-100 font-semibold'
-                : 'bg-neutral-900/60 text-neutral-400 border-neutral-800 hover:text-white'
+                ? 'bg-white text-black border-white font-semibold'
+                : 'bg-transparent text-gray-400 border-[#333] hover:text-white'
             }`}
           >
             1 Returned
           </button>
           <button
             onClick={() => setFilter('approved')}
-            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+            className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${
               filter === 'approved'
-                ? 'bg-neutral-100 text-neutral-900 border-neutral-100 font-semibold'
-                : 'bg-neutral-900/60 text-neutral-400 border-neutral-800 hover:text-white'
+                ? 'bg-white text-black border-white font-semibold'
+                : 'bg-transparent text-gray-400 border-[#333] hover:text-white'
             }`}
           >
             2 Approved
           </button>
         </div>
 
-        {/* Hairline-Ruled Table matching Screen 5 */}
-        <div className="border border-border rounded-lg overflow-hidden bg-card">
-          <Table>
-            <TableHeader className="bg-neutral-900/50">
-              <TableRow className="border-b border-border">
-                <TableHead className="text-xs uppercase tracking-wider text-neutral-400 font-medium py-3 px-4">
-                  Quotation
-                </TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-neutral-400 font-medium py-3 px-4">
-                  Customer
-                </TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-neutral-400 font-medium py-3 px-4">
-                  Blended Risk
-                </TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-neutral-400 font-medium py-3 px-4">
-                  Stage
-                </TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-neutral-400 font-medium py-3 px-4">
-                  Assigned To
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="divide-y divide-border/60">
-              {filteredApprovals.map((item) => (
-                <TableRow
-                  key={item.id}
-                  className="hover:bg-neutral-900/50 cursor-pointer transition-colors"
-                >
-                  <TableCell className="py-3 px-4 font-mono font-medium text-white text-xs">
-                    {item.quoteNumber}
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-xs text-neutral-200">
-                    {item.customerName}
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-xs font-mono">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
-                        item.riskLevel === 'HIGH'
-                          ? 'bg-neutral-800 text-neutral-200 border border-neutral-700'
-                          : item.riskLevel === 'MEDIUM'
-                            ? 'bg-neutral-900 text-neutral-300 border border-neutral-800'
-                            : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
-                      }`}
-                    >
-                      {item.brsScore}
+        {/* Minimal Ruled Table */}
+        <div className="border border-[#222] rounded-lg overflow-hidden bg-[#0e0e0e]">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-[#222] bg-[#141414] text-gray-400 uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-4 font-medium">Quotation</th>
+                <th className="py-3 px-4 font-medium">Customer</th>
+                <th className="py-3 px-4 font-medium">Blended Risk</th>
+                <th className="py-3 px-4 font-medium">Stage</th>
+                <th className="py-3 px-4 font-medium">Assigned To</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1e1e1e]">
+              {filtered.map((row) => (
+                <tr key={row.id} className="hover:bg-[#181818] transition-colors cursor-pointer">
+                  <td className="py-3 px-4 font-mono font-semibold text-white">{row.quoteId}</td>
+                  <td className="py-3 px-4 text-gray-300">{row.customer}</td>
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono border border-[#333] bg-[#1a1a1a] text-gray-300">
+                      {row.blendedRisk}
                     </span>
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-xs text-neutral-300">
-                    {item.stage}
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-xs text-neutral-300">
-                    {item.assignedTo}
-                  </TableCell>
-                </TableRow>
+                  </td>
+                  <td className="py-3 px-4 text-gray-300">{row.stage}</td>
+                  <td className="py-3 px-4 text-gray-300">{row.assignedTo}</td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
 
-        {/* Helpful text footer from Screen 5 */}
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-gray-500">
           Click any row to open full approval detail, risk breakdown, and audit trail.
         </p>
-      </div>
-    </AppShell>
+      </main>
+    </div>
   );
 }
