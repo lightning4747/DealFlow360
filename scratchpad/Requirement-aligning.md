@@ -158,6 +158,20 @@ Correction
 
 Dependencies
 
+Requires a portal session design and quote/customer binding.
+
+### Remediation status — P0-4
+
+Completed in the portal-session remediation commit:
+
+- Magic-link verification now supports the generated quote link without exposing a quote ID in the URL.
+- Verification consumes the magic link once and returns a signed portal JWT.
+- Portal view, counter-proposal, and confirmation routes require and cryptographically verify that JWT through `x-portal-token`.
+- Portal operations use the session-bound quote ID and email rather than caller-supplied identifiers.
+- Replay of a consumed magic link is rejected with `MAGIC_LINK_ALREADY_USED`.
+
+Remaining dependency: add persistent portal-session revocation/rotation and integration tests for quote/customer binding across session expiry and concurrent use.
+
 Requires coordinated changes to login UI, tests, seed data, and deployment configuration.
 
 ────────────────────

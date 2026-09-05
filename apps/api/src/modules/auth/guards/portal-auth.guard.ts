@@ -1,7 +1,10 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class PortalAuthGuard implements CanActivate {
+  private readonly jwtSecret = process.env.JWT_SECRET || 'super_secret_jwt_key_dealflow360_change_in_production';
+
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const token = request.headers['x-portal-token'] || request.cookies?.df360_portal;
@@ -15,8 +18,7 @@ export class PortalAuthGuard implements CanActivate {
     }
 
     try {
-      const base64Payload = token.split('.')[1];
-      const payload = JSON.parse(Buffer.from(base64Payload, 'base64').toString());
+      const payload = jwt.verify(token, this.jwtSecret) as { type?: string };
       if (payload.type !== 'portal') {
         throw new Error('Not a portal token');
       }

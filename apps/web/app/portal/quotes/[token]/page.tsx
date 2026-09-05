@@ -21,6 +21,7 @@ export default function CustomerPortalNegotiationPage() {
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [portalToken, setPortalToken] = useState<string | null>(null);
   const [liveUsers, setLiveUsers] = useState<string[]>(['Customer Procurement']);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -29,7 +30,20 @@ export default function CustomerPortalNegotiationPage() {
   useEffect(() => {
     async function loadQuote() {
       try {
-        const res = await fetch(`${apiUrl}/portal/quotes/view?token=${encodeURIComponent(token)}`);
+        const verifyRes = await fetch(`${apiUrl}/portal/auth/magic-link/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        if (!verifyRes.ok) throw new Error('This customer portal link is invalid, expired, or already used.');
+        const verifyJson = await verifyRes.json();
+        const sessionToken = verifyJson.data?.portalToken;
+        if (!sessionToken) throw new Error('Portal session could not be established.');
+        setPortalToken(sessionToken);
+
+        const res = await fetch(`${apiUrl}/portal/quotes/view`, {
+          headers: { 'x-portal-token': sessionToken },
+        });
 
         if (res.ok) {
           const json = await res.json();
@@ -47,8 +61,8 @@ export default function CustomerPortalNegotiationPage() {
             })),
           });
         }
-      } catch (err) {
-        console.warn('Could not load live quote, fallback active:', err);
+      } catch (err: any) {
+        console.error('Could not establish customer portal session:', err);
       }
     }
 
@@ -100,9 +114,10 @@ export default function CustomerPortalNegotiationPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch(`${apiUrl}/portal/quotes/counter?token=${token}`, {
+      if (!portalToken) return;
+      const res = await fetch(`${apiUrl}/portal/quotes/counter`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-portal-token': portalToken },
         body: JSON.stringify({
           counterDiscountPct: counterDiscount,
           notes: customerComment,
@@ -110,6 +125,7 @@ export default function CustomerPortalNegotiationPage() {
         }),
       });
 
+      if (!res.ok) throw new Error('Counter proposal could not be submitted.');
       setComments((prev) => [
         ...prev,
         {
@@ -120,17 +136,8 @@ export default function CustomerPortalNegotiationPage() {
         },
       ]);
       setCustomerComment('');
-    } catch {
-      setComments((prev) => [
-        ...prev,
-        {
-          id: String(Date.now()),
-          participantName: 'Acme Procurement (You)',
-          notes: `${counterDiscount}% counter proposed: ${customerComment || 'Requested revised terms.'}`,
-          date: 'Just now',
-        },
-      ]);
-      setCustomerComment('');
+    } catch (err) {
+      console.error('Counter proposal failed:', err);
     } finally {
       setSubmitting(false);
     }
@@ -139,9 +146,10 @@ export default function CustomerPortalNegotiationPage() {
   const handleConfirmQuote = async () => {
     setSubmitting(true);
     try {
-      const res = await fetch(`${apiUrl}/portal/quotes/confirm?token=${token}`, {
+      if (!portalToken) return;
+      const res = await fetch(`${apiUrl}/portal/quotes/confirm`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-portal-token': portalToken },
         body: JSON.stringify({
           participantName: 'Acme Procurement',
         }),
@@ -160,8 +168,9 @@ export default function CustomerPortalNegotiationPage() {
           },
         ]);
       }
-    } catch {
-      setConfirmed(true);
+      else throw new Error('Quotation confirmation failed.');
+    } catch (err) {
+      console.error('Quotation confirmation failed:', err);
     } finally {
       setSubmitting(false);
     }

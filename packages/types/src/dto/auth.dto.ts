@@ -55,6 +55,6 @@ export type MagicLinkRequest = z.infer<typeof MagicLinkRequestSchema>;
 
 export const MagicLinkVerifySchema = z.object({
   token: z.string().min(16),
-  quoteId: z.string().uuid(),
+  quoteId: z.string().uuid().optional(),
 });
 export type MagicLinkVerify = z.infer<typeof MagicLinkVerifySchema>;

@@ -222,10 +222,10 @@ export class AuthService {
   }
 
   async verifyMagicLink(verify: MagicLinkVerify): Promise<{ portalToken: string; quoteId: string }> {
-    if (!verify.token || !verify.quoteId) {
+    if (!verify.token) {
       throw new BadRequestException({
         code: 'INVALID_MAGIC_LINK',
-        message: 'Token and quoteId are required',
+        message: 'Token is required',
         statusCode: 400,
       });
     }
@@ -234,7 +234,11 @@ export class AuthService {
     const [record] = await db
       .select()
       .from(magicLinks)
-      .where(and(eq(magicLinks.tokenHash, tokenHash), eq(magicLinks.quoteId, verify.quoteId)))
+      .where(
+        verify.quoteId
+          ? and(eq(magicLinks.tokenHash, tokenHash), eq(magicLinks.quoteId, verify.quoteId))
+          : eq(magicLinks.tokenHash, tokenHash),
+      )
       .limit(1);
 
     if (!record) {

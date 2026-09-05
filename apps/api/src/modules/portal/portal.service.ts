@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DRIZZLE_DB } from '../database/database.module';
-import { magicLinks, quotes, quoteLines, products, lineComments, negotiationSessions } from '@dealflow360/database';
-import { eq, and, gt } from 'drizzle-orm';
+import { quotes, quoteLines, products, lineComments, negotiationSessions } from '@dealflow360/database';
+import { eq } from 'drizzle-orm';
 import { CustomerCounterProposalDto } from '@dealflow360/types';
 import { ApprovalRoutingService } from '../governance/approval-routing.service';
 import { OrderBifurcationService } from '../billing/order-bifurcation.service';
@@ -15,21 +15,8 @@ export class PortalService {
     @Inject(OrderBifurcationService) private readonly orderBifurcationService: OrderBifurcationService,
   ) {}
 
-  async getSanitizedQuoteByToken(token: string) {
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-
-    // 1. Validate magic link token
-    const [magicLink] = await this.db
-      .select()
-      .from(magicLinks)
-      .where(and(eq(magicLinks.tokenHash, tokenHash), gt(magicLinks.expiresAt, new Date())));
-
-    if (!magicLink) {
-      throw new NotFoundException('Magic link is invalid or has expired');
-    }
-
-    // 2. Fetch Quote
-    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, magicLink.quoteId));
+  async getSanitizedQuoteBySession(session: { quoteId: string; email: string }) {
+    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, session.quoteId));
     if (!quote) {
       throw new NotFoundException('Quote not found');
     }
@@ -46,7 +33,7 @@ export class PortalService {
         lineType: quoteLines.lineType,
       })
       .from(quoteLines)
-      .where(eq(quoteLines.quoteId, magicLink.quoteId));
+      .where(eq(quoteLines.quoteId, session.quoteId));
 
     // Get product details
     const linesWithProducts = await Promise.all(
@@ -77,24 +64,13 @@ export class PortalService {
         expiresAt: quote.expiresAt,
         counterDiscountPct: quote.counterDiscountPct,
       },
-      customerEmail: magicLink.email,
+      customerEmail: session.email,
       lines: linesWithProducts,
     };
   }
 
-  async submitCounterProposal(token: string, dto: CustomerCounterProposalDto) {
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-
-    const [magicLink] = await this.db
-      .select()
-      .from(magicLinks)
-      .where(and(eq(magicLinks.tokenHash, tokenHash), gt(magicLinks.expiresAt, new Date())));
-
-    if (!magicLink) {
-      throw new NotFoundException('Magic link is invalid or expired');
-    }
-
-    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, magicLink.quoteId));
+  async submitCounterProposalBySession(session: { quoteId: string; email: string }, dto: CustomerCounterProposalDto) {
+    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, session.quoteId));
     if (!quote) {
       throw new NotFoundException('Quote not found');
     }
@@ -120,7 +96,7 @@ export class PortalService {
     await this.db.insert(negotiationSessions).values({
       quoteId: quote.id,
       sessionToken,
-      participantEmail: magicLink.email,
+      participantEmail: session.email,
       participantName: dto.participantName,
       participantRole: 'customer',
       status: 'active',
@@ -143,19 +119,8 @@ export class PortalService {
     };
   }
 
-  async confirmQuoteByToken(token: string, participantName?: string) {
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-
-    const [magicLink] = await this.db
-      .select()
-      .from(magicLinks)
-      .where(and(eq(magicLinks.tokenHash, tokenHash), gt(magicLinks.expiresAt, new Date())));
-
-    if (!magicLink) {
-      throw new NotFoundException('Magic link is invalid or expired');
-    }
-
-    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, magicLink.quoteId));
+  async confirmQuoteBySession(session: { quoteId: string; email: string }, participantName?: string) {
+    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, session.quoteId));
     if (!quote) {
       throw new NotFoundException('Quote not found');
     }
