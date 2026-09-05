@@ -39,7 +39,8 @@ interface FullQuoteDetail {
   lines: QuoteLineItem[];
 }
 
-const STAGES = ['draft', 'pending_approval', 'sent', 'under_negotiation', 'confirmed'];
+const STAGES = ['draft', 'sent', 'under_negotiation', 'pending_approval', 'confirmed'];
+const STAGE_LABELS = ['1. Draft', '2. Customer Sent', '3. Negotiation', '4. Governance Approval', '5. Confirmed'];
 
 export default function QuotationDetailPage() {
   const params = useParams();
@@ -52,6 +53,7 @@ export default function QuotationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
 
   const fetchQuoteDetail = async () => {
     if (!quoteId) return;
@@ -76,6 +78,35 @@ export default function QuotationDetailPage() {
   useEffect(() => {
     fetchQuoteDetail();
   }, [quoteId, user]);
+
+  const handleGeneratePortalLink = async () => {
+    if (!quote) return;
+    setActionLoading(true);
+    setStatusMessage(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/portal/auth/magic-link/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quoteId: quote.id,
+          email: 'customer@client.com',
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const url = json.data?.portalUrl || `/portal/quotes/${json.data?.token}`;
+        setPortalUrl(url);
+        setStatusMessage(`Customer Portal link ready: ${window.location.origin}${url}`);
+      } else {
+        setStatusMessage('Could not generate customer portal link');
+      }
+    } catch (err: any) {
+      setStatusMessage(err.message || 'Error generating link');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleSubmitForApproval = async () => {
     if (!quote) return;
@@ -151,7 +182,25 @@ export default function QuotationDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {quote?.status === 'draft' && (
+            <button
+              type="button"
+              onClick={handleGeneratePortalLink}
+              disabled={actionLoading}
+              className="px-3 py-1.5 rounded text-xs font-medium border border-[#333] text-gray-200 hover:bg-[#1a1a1a] transition disabled:opacity-50"
+            >
+              {actionLoading ? 'Generating...' : 'Customer Portal Link'}
+            </button>
+            {portalUrl && (
+              <a
+                href={portalUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition"
+              >
+                Open Portal ↗
+              </a>
+            )}
+            {(quote?.status === 'draft' || quote?.status === 'under_negotiation') && (
               <button
                 type="button"
                 onClick={handleSubmitForApproval}
@@ -171,19 +220,24 @@ export default function QuotationDetailPage() {
         </div>
 
         {statusMessage && (
-          <div className="p-3 bg-[#111] border border-[#333] rounded-lg text-xs text-gray-200">
-            {statusMessage}
+          <div className="p-3 bg-[#111] border border-[#333] rounded-lg text-xs text-gray-200 flex items-center justify-between">
+            <span>{statusMessage}</span>
+            {portalUrl && (
+              <a href={portalUrl} target="_blank" rel="noreferrer" className="underline text-white font-mono ml-3">
+                Visit Link
+              </a>
+            )}
           </div>
         )}
 
         {/* 5-Stage Progression Rail */}
         <div className="p-4 rounded-lg border border-[#222] bg-[#0d0d0d] flex items-center justify-between text-xs">
-          {['Draft', 'Pending Approval', 'Sent', 'Negotiation', 'Confirmed'].map((stageName, idx) => {
+          {STAGE_LABELS.map((stageLabel, idx) => {
             const isCompleted = idx < currentStageIndex;
             const isCurrent = idx === currentStageIndex || (currentStageIndex === -1 && idx === 0);
 
             return (
-              <React.Fragment key={stageName}>
+              <React.Fragment key={stageLabel}>
                 <div className={`flex items-center gap-2 ${isCurrent ? 'text-white font-semibold' : isCompleted ? 'text-gray-300' : 'text-gray-500'}`}>
                   <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${
                     isCurrent
@@ -194,7 +248,7 @@ export default function QuotationDetailPage() {
                   }`}>
                     {idx + 1}
                   </span>
-                  <span>{stageName}</span>
+                  <span>{stageLabel}</span>
                 </div>
                 {idx < 4 && (
                   <div className={`h-[1px] flex-1 mx-3 ${isCompleted ? 'bg-white/30' : 'bg-[#222]'}`} />

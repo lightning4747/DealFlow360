@@ -54,8 +54,9 @@ export class SpatialAllocationEngine {
       const custRes = await this.db.execute(
         sql`SELECT delivery_latitude, delivery_longitude FROM sales.customers WHERE id = ${customerId}`
       );
-      if (custRes.rows && custRes.rows[0]) {
-        const row = custRes.rows[0];
+      const custRows: any[] = Array.isArray(custRes) ? custRes : (custRes as any)?.rows || [];
+      if (custRows[0]) {
+        const row = custRows[0];
         if (row.delivery_latitude && row.delivery_longitude) {
           return {
             latitude: parseFloat(row.delivery_latitude),
@@ -95,7 +96,11 @@ export class SpatialAllocationEngine {
           ORDER BY distance_km ASC`
     );
 
-    const candidateHubs: WarehouseCandidate[] = warehouseRows.rows.map((r: any) => ({
+    const warehouseList: any[] = Array.isArray(warehouseRows)
+      ? warehouseRows
+      : (warehouseRows as any)?.rows || [];
+
+    const candidateHubs: WarehouseCandidate[] = warehouseList.map((r: any) => ({
       id: r.id,
       code: r.code,
       name: r.name,
@@ -106,16 +111,20 @@ export class SpatialAllocationEngine {
 
     // 2. Fetch stock levels across all hubs for the requested items
     const productIds = dto.items.map((i) => i.productId);
-    const stockRows = await this.db.execute(
+    const stockResult = await this.db.execute(
       sql`SELECT ws.warehouse_id, ws.product_id, ws.available_qty,
-                 p.name as product_name, p.sku, p.cost_price as unit_cost
+                 p.name as product_name, p.sku, p.unit_cost as unit_cost
           FROM fulfillment.warehouse_stock ws
-          JOIN catalog.products p ON ws.product_id = p.id
+          JOIN sales.products p ON ws.product_id = p.id
           WHERE ws.product_id IN (${sql.join(productIds, sql`, `)})`
     );
 
+    const stockList: any[] = Array.isArray(stockResult)
+      ? stockResult
+      : (stockResult as any)?.rows || [];
+
     const stockMap = new Map<string, Map<string, { available: number; name: string; sku: string; cost: number }>>();
-    for (const r of stockRows.rows) {
+    for (const r of stockList) {
       if (!stockMap.has(r.warehouse_id)) {
         stockMap.set(r.warehouse_id, new Map());
       }

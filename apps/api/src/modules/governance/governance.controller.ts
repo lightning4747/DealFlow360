@@ -32,7 +32,8 @@ export class GovernanceController {
   ])
   @Roles('sales_manager', 'finance', 'admin')
   async listApprovals(@Req() req: any) {
-    return this.approvalService.listPendingApprovals(req.user);
+    const data = await this.approvalService.listPendingApprovals(req.user);
+    return { data, meta: null, error: null };
   }
 
   // 3. Approval Details
@@ -43,7 +44,8 @@ export class GovernanceController {
   ])
   @Roles('sales_manager', 'finance', 'admin')
   async getApprovalDetails(@Param('id') approvalId: string) {
-    return this.approvalService.getApprovalDetails(approvalId);
+    const data = await this.approvalService.getApprovalDetails(approvalId);
+    return { data, meta: null, error: null };
   }
 
   // 4. Approve Action

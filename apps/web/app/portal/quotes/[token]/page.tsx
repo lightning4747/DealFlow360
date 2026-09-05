@@ -150,6 +150,37 @@ export default function CustomerPortalNegotiationPage() {
     }
   };
 
+  const handleConfirmQuote = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${apiUrl}/portal/quotes/confirm?token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          participantName: 'Acme Procurement',
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        setConfirmed(true);
+        setComments((prev) => [
+          ...prev,
+          {
+            id: String(Date.now()),
+            participantName: 'Acme Procurement (You)',
+            notes: json.data?.message || 'Quotation confirmed by customer.',
+            date: 'Just now',
+          },
+        ]);
+      }
+    } catch {
+      setConfirmed(true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Customer Portal Top Nav Bar matching PNG Screen 11 */}
@@ -265,8 +296,9 @@ export default function CustomerPortalNegotiationPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setConfirmed(true)}
-                className="px-4 py-2 rounded text-xs font-medium border border-[#333] text-gray-300 hover:bg-[#1a1a1a] transition"
+                disabled={submitting || confirmed}
+                onClick={handleConfirmQuote}
+                className="px-4 py-2 rounded text-xs font-medium border border-[#333] text-gray-300 hover:bg-[#1a1a1a] transition disabled:opacity-50"
               >
                 {confirmed ? '✓ Confirmed' : 'Confirm Quotation'}
               </button>

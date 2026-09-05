@@ -75,7 +75,7 @@ export class FulfillmentService {
                  fs.carrier, fs.tracking_number, fs.estimated_delivery_days, fs.created_at
           FROM fulfillment.fulfillment_splits fs
           JOIN fulfillment.warehouses w ON fs.warehouse_id = w.id
-          JOIN catalog.products p ON fs.product_id = p.id
+          JOIN sales.products p ON fs.product_id = p.id
           WHERE fs.quote_id = ${quoteId}
           ORDER BY w.name, p.name`
     );
@@ -85,14 +85,17 @@ export class FulfillmentService {
                  bo.requested_qty, bo.allocated_qty, bo.backorder_qty, bo.status,
                  bo.estimated_restock_date, bo.created_at
           FROM fulfillment.backorders bo
-          JOIN catalog.products p ON bo.product_id = p.id
+          JOIN sales.products p ON bo.product_id = p.id
           WHERE bo.quote_id = ${quoteId}`
     );
 
+    const splitsRows = Array.isArray(splitsResult) ? splitsResult : (splitsResult as any)?.rows || [];
+    const backorderRows = Array.isArray(backordersResult) ? backordersResult : (backordersResult as any)?.rows || [];
+
     return {
       quoteId,
-      splits: splitsResult.rows,
-      backorders: backordersResult.rows,
+      splits: splitsRows,
+      backorders: backorderRows,
     };
   }
 
@@ -106,6 +109,6 @@ export class FulfillmentService {
           WHERE is_active = true
           ORDER BY code ASC`
     );
-    return result.rows;
+    return Array.isArray(result) ? result : (result as any)?.rows || [];
   }
 }

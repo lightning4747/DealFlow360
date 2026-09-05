@@ -45,7 +45,12 @@ export class AuthController {
     const payload = MagicLinkRequestSchema.parse(body);
     const result = await this.authService.generateMagicLink(payload);
     return {
-      data: { message: 'Magic link generated successfully', expiresAt: result.expiresAt },
+      data: {
+        message: 'Magic link generated successfully',
+        token: result.token,
+        portalUrl: `/portal/quotes/${result.token}`,
+        expiresAt: result.expiresAt,
+      },
       meta: { timestamp: new Date().toISOString() },
       error: null,
     };

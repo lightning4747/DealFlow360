@@ -20,7 +20,7 @@ import {
   ReleaseStockRequestSchema,
 } from '@dealflow360/types';
 
-@Controller('api/v1/fulfillment')
+@Controller(['api/v1/fulfillment', 'api/v1/sales/fulfillment'])
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FulfillmentController {
   constructor(

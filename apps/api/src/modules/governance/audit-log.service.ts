@@ -21,16 +21,25 @@ export class AuditLogService {
 
   async log(entry: AuditEntry, tx?: any): Promise<void> {
     const executor = tx || this.db;
+    const isValidUuid = (val?: string) =>
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
+    const safeActorId = isValidUuid(entry.actorId) ? entry.actorId : null;
+
     try {
       await executor.insert(auditLogs).values({
         entityType: entry.entityType,
         entityId: entry.entityId,
         action: entry.action,
-        actorId: entry.actorId || null,
+        actorId: safeActorId,
         actorRole: entry.actorRole || null,
         stateBefore: entry.stateBefore || null,
         stateAfter: entry.stateAfter || null,
-        metadata: entry.metadata || null,
+        metadata: {
+          ...(entry.metadata || {}),
+          ...(!safeActorId && entry.actorId ? { rawActorId: entry.actorId } : {}),
+        },
       });
       this.logger.log(`Audit log written: ${entry.action} on ${entry.entityType}:${entry.entityId}`);
     } catch (err: any) {

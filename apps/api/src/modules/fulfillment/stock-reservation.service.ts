@@ -158,7 +158,7 @@ export class StockReservationService {
                  ws.available_qty, ws.reserved_qty, ws.updated_at
           FROM fulfillment.warehouse_stock ws
           JOIN fulfillment.warehouses w ON ws.warehouse_id = w.id
-          JOIN catalog.products p ON ws.product_id = p.id
+          JOIN sales.products p ON ws.product_id = p.id
           ${whereClause}
           ORDER BY w.name, p.name`
     );

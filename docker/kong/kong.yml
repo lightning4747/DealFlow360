@@ -43,6 +43,7 @@ services:
         paths:
           - /api/v1/sales
           - /api/v1/internal
+          - /api/v1/fulfillment
         strip_path: false
         preserve_host: true
         plugins:

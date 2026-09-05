@@ -140,4 +140,57 @@ export class PortalService {
       quote: updatedQuote,
     };
   }
+
+  async confirmQuoteByToken(token: string, participantName?: string) {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const [magicLink] = await this.db
+      .select()
+      .from(magicLinks)
+      .where(and(eq(magicLinks.tokenHash, tokenHash), gt(magicLinks.expiresAt, new Date())));
+
+    if (!magicLink) {
+      throw new NotFoundException('Magic link is invalid or expired');
+    }
+
+    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, magicLink.quoteId));
+    if (!quote) {
+      throw new NotFoundException('Quote not found');
+    }
+
+    const counterDiscount = parseFloat(quote.counterDiscountPct || '0');
+
+    // FR-40 & FR-41: If customer counter discount or terms exceed threshold (>15%) AND quote is not yet approved
+    if (counterDiscount > 15 && quote.status !== 'sent') {
+      const submission = await this.approvalRoutingService.submitQuote(quote.id, {
+        id: 'external-customer',
+        role: 'customer',
+        name: participantName || 'Authorized Customer',
+      });
+      return {
+        success: true,
+        status: 'pending_approval',
+        message: 'Order terms submitted for governance approval.',
+        quote: submission.quote || quote,
+      };
+    }
+
+    // Otherwise within threshold or already approved -> quote is confirmed and ready for fulfillment
+    const [confirmedQuote] = await this.db
+      .update(quotes)
+      .set({
+        status: 'confirmed',
+        updatedAt: new Date(),
+      })
+      .where(eq(quotes.id, quote.id))
+      .returning();
+
+    return {
+      success: true,
+      status: 'confirmed',
+      message: 'Quotation confirmed! Order is now approved and ready for warehouse fulfillment.',
+      quote: confirmedQuote,
+    };
+  }
 }
+

@@ -36,8 +36,8 @@ export class ApprovalRoutingService {
       throw new NotFoundException(`Quote with ID ${quoteId} not found`);
     }
 
-    if (quote.status !== 'draft') {
-      throw new BadRequestException(`Quote cannot be submitted in status '${quote.status}'. Only 'draft' quotes can be submitted.`);
+    if (quote.status !== 'draft' && quote.status !== 'under_negotiation' && quote.status !== 'sent') {
+      throw new BadRequestException(`Quote cannot be submitted in status '${quote.status}'. Only 'draft', 'under_negotiation', or 'sent' quotes can be submitted.`);
     }
 
     // 2. Fetch Customer & Tier
@@ -94,14 +94,17 @@ export class ApprovalRoutingService {
       ceilingMap.set(c.category, Number(c.maxDiscountPct));
     }
 
-    // 5. Build BRS inputs & calculate BRS
+    // 5. Build BRS inputs & calculate BRS (incorporating overall counter discount if present)
+    const overallCounterDiscount = parseFloat(quote.counterDiscountPct || '0');
     const brsInputs = lines.map((l: any) => {
       const ceilingPct = ceilingMap.get(l.category) ?? 10.0; // fallback default
+      const lineDisc = Number(l.discountPct);
+      const effectiveDiscount = overallCounterDiscount > 0 ? Math.max(lineDisc, overallCounterDiscount) : lineDisc;
       return {
         lineId: l.lineId,
         quantity: l.quantity,
         unitPrice: Number(l.unitPrice),
-        appliedDiscountPct: Number(l.discountPct),
+        appliedDiscountPct: effectiveDiscount,
         tierCeilingPct: ceilingPct,
       };
     });

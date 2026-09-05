@@ -26,10 +26,10 @@ interface ColumnDef {
 
 const COLUMNS_DEF: ColumnDef[] = [
   { key: 'draft', title: 'Draft', statuses: ['draft'] },
-  { key: 'pending', title: 'Pending Approval', statuses: ['pending_approval'] },
-  { key: 'approved', title: 'Approved', statuses: ['approved', 'sent'] },
+  { key: 'sent', title: 'Sent to Customer', statuses: ['sent'] },
   { key: 'negotiation', title: 'Negotiation', statuses: ['under_negotiation', 'negotiation'] },
-  { key: 'confirmed', title: 'Confirmed', statuses: ['confirmed', 'fulfilled'] },
+  { key: 'pending', title: 'Governance Approval', statuses: ['pending_approval'] },
+  { key: 'confirmed', title: 'Confirmed / Ready', statuses: ['confirmed', 'approved', 'fulfilled'] },
 ];
 
 export default function QuotationsPage() {

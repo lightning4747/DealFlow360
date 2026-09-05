@@ -21,4 +21,13 @@ export class PortalController {
     const data = await this.portalService.submitCounterProposal(token, dto);
     return { data, meta: null, error: null };
   }
+
+  @Public()
+  @Post('confirm')
+  async confirmQuote(@Query('token') token: string, @Body() body: any) {
+    const participantName = body?.participantName;
+    const data = await this.portalService.confirmQuoteByToken(token, participantName);
+    return { data, meta: null, error: null };
+  }
 }
+
