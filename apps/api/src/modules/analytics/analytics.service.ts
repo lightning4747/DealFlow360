@@ -14,7 +14,9 @@ export class AnalyticsService {
   constructor(
     @Inject(DRIZZLE_DB)
     private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(AnomalyDetectionService)
     private readonly anomalyService: AnomalyDetectionService,
+    @Inject(StalledDealsService)
     private readonly stalledDealsService: StalledDealsService,
   ) {}
 

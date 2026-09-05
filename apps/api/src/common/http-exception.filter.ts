@@ -4,12 +4,15 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ZodError } from 'zod';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -36,6 +39,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       details = exception.errors;
     } else if (exception instanceof Error) {
       message = exception.message;
+      this.logger.error(`Unhandled Exception: ${exception.message}`, exception.stack);
+    } else {
+      this.logger.error(`Unknown Exception: ${JSON.stringify(exception)}`);
     }
 
     response.status(status).json({

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Headers, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Query, Headers, BadRequestException, Inject } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { AnomalyDetectionService } from './anomaly-detection.service';
 import { StalledDealsService } from './stalled-deals.service';
@@ -7,9 +7,9 @@ import { QueryAnalyticsDtoSchema } from '@dealflow360/types';
 @Controller('analytics')
 export class AnalyticsController {
   constructor(
-    private readonly analyticsService: AnalyticsService,
-    private readonly anomalyService: AnomalyDetectionService,
-    private readonly stalledDealsService: StalledDealsService,
+    @Inject(AnalyticsService) private readonly analyticsService: AnalyticsService,
+    @Inject(AnomalyDetectionService) private readonly anomalyService: AnomalyDetectionService,
+    @Inject(StalledDealsService) private readonly stalledDealsService: StalledDealsService,
   ) {}
 
   @Get('deal-health')
