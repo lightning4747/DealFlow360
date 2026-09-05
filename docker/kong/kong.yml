@@ -103,6 +103,17 @@ services:
               credentials: true
               max_age: 3600
 
+      # Real-time WebSockets & Socket.IO deal negotiation proxy
+      - name: socketio-route
+        paths:
+          - /socket.io
+        protocols:
+          - http
+          - https
+          - tcp
+        strip_path: false
+        preserve_host: true
+
 plugins:
   # Correlation ID propagation plugin (UUID v4 header generation)
   - name: correlation-id
