@@ -13,12 +13,37 @@ import {
   Database,
   ExternalLink,
   Building2,
+  Menu,
+  ChevronLeft,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react';
 import { AccountSwitcher } from '../../components/account-switcher';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [userRole, setUserRole] = useState<string>('admin');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+
+  useEffect(() => {
+    try {
+      const storedSidebar = localStorage.getItem('admin_sidebar_open');
+      if (storedSidebar !== null) {
+        setIsSidebarOpen(storedSidebar === 'true');
+      }
+    } catch {}
+  }, []);
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('admin_sidebar_open', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     try {
@@ -52,24 +77,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-800 bg-slate-900/70 flex flex-col justify-between shrink-0">
+      <aside
+        className={`${
+          isSidebarOpen ? 'w-64' : 'w-20'
+        } border-r border-slate-800 bg-slate-900/70 flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out relative`}
+      >
         <div>
           {/* Brand header */}
-          <div className="p-6 border-b border-slate-800 flex items-center space-x-3">
-            <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
-              DF
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center space-x-3 overflow-hidden">
+              <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20 shrink-0">
+                DF
+              </div>
+              {isSidebarOpen && (
+                <div className="whitespace-nowrap transition-opacity duration-200">
+                  <h1 className="font-semibold text-base leading-none text-white">DealFlow360</h1>
+                  <p className="text-xs text-slate-400 mt-1">Master Data Admin</p>
+                </div>
+              )}
             </div>
-            <div>
-              <h1 className="font-semibold text-base leading-none text-white">DealFlow360</h1>
-              <p className="text-xs text-slate-400 mt-1">Master Data Admin</p>
-            </div>
+            <button
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title={isSidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
+            >
+              {isSidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+            </button>
           </div>
 
           {/* Nav links */}
-          <nav className="p-4 space-y-1">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">
-              Master Data Management
-            </div>
+          <nav className="p-3 space-y-1">
+            {isSidebarOpen && (
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">
+                Master Data Management
+              </div>
+            )}
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
@@ -77,7 +119,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  title={!isSidebarOpen ? item.name : undefined}
+                  className={`flex items-center ${
+                    isSidebarOpen ? 'space-x-3 px-3' : 'justify-center px-0'
+                  } py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
                       : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'

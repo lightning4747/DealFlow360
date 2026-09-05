@@ -19,6 +19,10 @@ import {
   FileText,
   Package,
   Building2,
+  Layers,
+  FileSpreadsheet,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react';
 import { AccountSwitcher } from '../../components/account-switcher';
 
@@ -97,6 +101,26 @@ export default function ApprovalsPage() {
   const [details, setDetails] = useState<ApprovalDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [userRole, setUserRole] = useState<string>('sales_manager');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+
+  useEffect(() => {
+    try {
+      const storedSidebar = localStorage.getItem('approvals_sidebar_open');
+      if (storedSidebar !== null) {
+        setIsSidebarOpen(storedSidebar === 'true');
+      }
+    } catch {}
+  }, []);
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('approvals_sidebar_open', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     try {
@@ -378,49 +402,162 @@ export default function ApprovalsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+      {/* Collapsible Sidebar */}
+      <aside
+        className={`${
+          isSidebarOpen ? 'w-64' : 'w-20'
+        } border-r border-slate-800 bg-slate-900/70 flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out relative`}
+      >
         <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20">
-              <Shield className="w-6 h-6" />
+          {/* Brand header */}
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center space-x-3 overflow-hidden">
+              <div className="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20 shrink-0">
+                DF
+              </div>
+              {isSidebarOpen && (
+                <div className="whitespace-nowrap transition-opacity duration-200">
+                  <h1 className="font-semibold text-base leading-none text-white">DealFlow360</h1>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {userRole === 'admin'
+                      ? 'Administration'
+                      : userRole === 'finance'
+                        ? 'Finance Portal'
+                        : 'Sales Management'}
+                  </p>
+                </div>
+              )}
             </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white">Governance & Approval Engine</h1>
-              <p className="text-sm text-slate-400">
-                Multi-tier discount exposure review, Blended Risk Score (BRS) arbitration & compliance
-              </p>
-            </div>
+            <button
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title={isSidebarOpen ? 'Collapse Sidebar' : 'Open Sidebar'}
+            >
+              {isSidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+            </button>
           </div>
+
+          {/* Navigation Links */}
+          <nav className="p-3 space-y-1">
+            {isSidebarOpen && (
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">
+                Workspaces
+              </div>
+            )}
+            <Link
+              href="/approvals"
+              title={!isSidebarOpen ? 'Governance Approvals' : undefined}
+              className={`flex items-center ${
+                isSidebarOpen ? 'space-x-3 px-3' : 'justify-center px-0'
+              } py-2.5 rounded-lg text-sm font-medium bg-indigo-600 text-white shadow-md shadow-indigo-600/20 transition`}
+            >
+              <Shield className="h-4 w-4 shrink-0" />
+              {isSidebarOpen && <span>Governance Approvals</span>}
+            </Link>
+
+            <Link
+              href="/catalog"
+              title={!isSidebarOpen ? 'Commercial Catalog' : undefined}
+              className={`flex items-center ${
+                isSidebarOpen ? 'space-x-3 px-3' : 'justify-center px-0'
+              } py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition`}
+            >
+              <Package className="h-4 w-4 shrink-0" />
+              {isSidebarOpen && <span>Commercial Catalog</span>}
+            </Link>
+
+            {userRole === 'admin' && (
+              <>
+                <Link
+                  href="/admin/products"
+                  title={!isSidebarOpen ? 'Products Master' : undefined}
+                  className={`flex items-center ${
+                    isSidebarOpen ? 'space-x-3 px-3' : 'justify-center px-0'
+                  } py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition`}
+                >
+                  <Package className="h-4 w-4 shrink-0" />
+                  {isSidebarOpen && <span>Products Master</span>}
+                </Link>
+                <Link
+                  href="/admin/tiers"
+                  title={!isSidebarOpen ? 'Customer Tiers' : undefined}
+                  className={`flex items-center ${
+                    isSidebarOpen ? 'space-x-3 px-3' : 'justify-center px-0'
+                  } py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition`}
+                >
+                  <Layers className="h-4 w-4 shrink-0" />
+                  {isSidebarOpen && <span>Customer Tiers</span>}
+                </Link>
+                <Link
+                  href="/admin/price-lists"
+                  title={!isSidebarOpen ? 'Price Lists' : undefined}
+                  className={`flex items-center ${
+                    isSidebarOpen ? 'space-x-3 px-3' : 'justify-center px-0'
+                  } py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition`}
+                >
+                  <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                  {isSidebarOpen && <span>Price Lists</span>}
+                </Link>
+              </>
+            )}
+          </nav>
         </div>
 
-        {/* Actions / User & Refresh */}
-        <div className="flex items-center gap-3">
-          <Link
-            href="/catalog"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
-          >
-            <Package className="w-3.5 h-3.5 text-blue-400" />
-            <span>Product Catalog</span>
-          </Link>
-          {userRole === 'admin' && (
-            <Link
-              href="/admin/products"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
+        {/* Sidebar Footer Role Card */}
+        {isSidebarOpen ? (
+          <div className="p-4 border-t border-slate-800 bg-slate-900/40 text-xs text-slate-400">
+            <div className="font-semibold text-white capitalize">{userRole.replace('_', ' ')} Mode</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">DealFlow360 Multi-Tier Governance</div>
+          </div>
+        ) : (
+          <div className="p-3 border-t border-slate-800 flex justify-center">
+            <Shield className="h-4 w-4 text-indigo-400" />
+          </div>
+        )}
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <header className="h-16 border-b border-slate-800 bg-slate-900/50 px-6 md:px-8 flex items-center justify-between shrink-0">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 transition"
+              title={isSidebarOpen ? 'Collapse Sidebar' : 'Open Sidebar'}
             >
-              <span>Admin Center</span>
-            </Link>
-          )}
-          <button
-            onClick={fetchApprovals}
-            className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
-          >
-            Refresh Queue
-          </button>
-          <AccountSwitcher />
-        </div>
-      </div>
+              {isSidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+            </button>
+            <div className="flex items-center space-x-2 text-sm text-slate-400">
+              <span className="font-medium text-slate-100">Governance & Approval Engine</span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={fetchApprovals}
+              className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium transition"
+            >
+              Refresh Queue
+            </button>
+            <AccountSwitcher />
+          </div>
+        </header>
+
+        <main className="flex-1 p-6 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
+          {/* Page Banner */}
+          <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-indigo-950/40 border border-slate-800 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20">
+                <Shield className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-white">Governance & Approval Engine</h2>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Multi-tier discount exposure review, Blended Risk Score (BRS) arbitration & compliance
+                </p>
+              </div>
+            </div>
+          </div>
 
       {/* Main Tabs */}
       <div className="max-w-7xl mx-auto">
@@ -788,6 +925,8 @@ export default function ApprovalsPage() {
           </div>
         </div>
       )}
+        </main>
+      </div>
     </div>
   );
 }
