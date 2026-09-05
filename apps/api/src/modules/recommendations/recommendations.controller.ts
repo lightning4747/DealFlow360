@@ -11,7 +11,7 @@ export class RecommendationsController {
   constructor(private readonly recService: RecommendationsService) {}
 
   @Post()
-  @Roles('admin', 'sales_rep', 'sales_manager')
+  @Roles('sales_rep')
   async getRecommendations(@Body() body: any) {
     const dto = QueryRecommendationsSchema.parse(body);
     const data = await this.recService.getRecommendations(dto);

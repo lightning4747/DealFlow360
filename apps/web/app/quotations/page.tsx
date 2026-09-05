@@ -75,12 +75,14 @@ export default function QuotationsPage() {
             >
               ↻ Refresh
             </button>
-            <Link
-              href="/quotations/new"
-              className="px-3 py-1.5 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition"
-            >
-              + New Quotation
-            </Link>
+            {user?.role === 'sales_rep' && (
+              <Link
+                href="/quotations/new"
+                className="px-3 py-1.5 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition"
+              >
+                + New Quotation
+              </Link>
+            )}
           </div>
         </div>
 

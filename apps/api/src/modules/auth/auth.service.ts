@@ -140,7 +140,9 @@ export class AuthService {
       .values({
         email: dto.email,
         name: dto.name,
-        role: dto.role as any,
+        // Public signup must not allow privilege escalation. Elevated roles are
+        // assigned by an administrator through the user-management flow.
+        role: 'sales_rep',
         hashedPassword,
       })
       .returning();

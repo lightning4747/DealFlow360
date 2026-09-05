@@ -39,7 +39,7 @@ export class QuotesController {
   }
 
   @Post('quotes/calculate')
-  @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
+  @Roles('sales_rep')
   async calculateQuote(@Body() body: any) {
     const dto = CalculateQuoteSchema.parse(body);
     const data = await this.quotesService.calculateQuote(dto);
@@ -47,7 +47,7 @@ export class QuotesController {
   }
 
   @Post('quotes')
-  @Roles('admin', 'sales_rep')
+  @Roles('sales_rep')
   async createQuote(@Body() body: any, @Req() req: any) {
     const dto = CreateQuoteSchema.parse(body);
     const data = await this.quotesService.createQuote(dto, req.user);
@@ -62,7 +62,7 @@ export class QuotesController {
   }
 
   @Patch('quotes/lines/:lineId')
-  @Roles('admin', 'sales_rep')
+  @Roles('sales_rep')
   async updateLine(@Param('lineId') lineId: string, @Body() body: any) {
     const dto = UpdateQuoteLineSchema.parse(body);
     const data = await this.quotesService.updateQuoteLine(lineId, dto);

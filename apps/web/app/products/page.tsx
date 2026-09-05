@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppHeader } from '@/components/app-header';
+import { useAuth } from '@/lib/auth-context';
 
 import { getAuthHeaders, API_BASE_URL } from '@/lib/api-client';
 
@@ -17,6 +18,7 @@ interface ProductItem {
 }
 
 export default function ProductsPage() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -68,12 +70,16 @@ export default function ProductsPage() {
             <p className="text-xs text-gray-400 mt-1">Every product, variant, and price list in one place.</p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="px-3 py-1.5 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition">
-              + New Product
-            </button>
-            <button className="px-3 py-1.5 rounded text-xs font-medium border border-[#333] text-gray-300 hover:bg-[#1a1a1a] transition">
-              Manage Price Fields
-            </button>
+            {user?.role === 'admin' && (
+              <>
+                <button className="px-3 py-1.5 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition">
+                  + New Product
+                </button>
+                <button className="px-3 py-1.5 rounded text-xs font-medium border border-[#333] text-gray-300 hover:bg-[#1a1a1a] transition">
+                  Manage Price Fields
+                </button>
+              </>
+            )}
           </div>
         </div>
 

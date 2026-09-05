@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppHeader } from '@/components/app-header';
+import { useAuth } from '@/lib/auth-context';
 import { getAuthHeaders, API_BASE_URL } from '@/lib/api-client';
 
 interface CustomerItem {
@@ -49,6 +50,7 @@ interface RecommendationItem {
 
 export default function NewQuotationPage() {
   const router = useRouter();
+  const { user, isLoading } = useAuth();
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [customerTier, setCustomerTier] = useState<'bronze' | 'silver' | 'gold' | 'platinum'>('silver');
@@ -59,6 +61,16 @@ export default function NewQuotationPage() {
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoading && user?.role !== 'sales_rep') {
+      router.replace('/quotations');
+    }
+  }, [isLoading, router, user]);
+
+  if (isLoading || user?.role !== 'sales_rep') {
+    return null;
+  }
 
   // 1. Load real customers from database
   useEffect(() => {

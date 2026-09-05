@@ -32,7 +32,7 @@ export class BillingController {
 
   // ─── QUOTE CONFIRMATION (BIFURCATION SPLIT) ────────────────────────────────
   @Post('sales/quotes/:id/confirm')
-  @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
+  @Roles('sales_rep', 'finance')
   async confirmQuote(@Param('id') id: string, @Req() req: any) {
     const actor = {
       id: req.user?.id || 'unknown',

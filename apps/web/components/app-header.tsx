@@ -6,16 +6,16 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 
 const NAV_TABS = [
-  { name: 'Dashboard', href: '/' },
-  { name: 'Quotations', href: '/quotations' },
-  { name: 'Approvals', href: '/approvals' },
-  { name: 'Fulfillment', href: '/fulfillment' },
-  { name: 'Subscriptions', href: '/subscriptions' },
-  { name: 'Invoices', href: '/invoices' },
-  { name: 'Deal Health', href: '/deal-health' },
-  { name: 'Reports', href: '/reports' },
-  { name: 'Products', href: '/products' },
-  { name: 'Customer Portal', href: '/portal' },
+  { name: 'Dashboard', href: '/', roles: ['admin', 'sales_rep', 'sales_manager', 'finance'] },
+  { name: 'Quotations', href: '/quotations', roles: ['admin', 'sales_rep', 'sales_manager', 'finance'] },
+  { name: 'Approvals', href: '/approvals', roles: ['admin', 'sales_manager', 'finance'] },
+  { name: 'Fulfillment', href: '/fulfillment', roles: ['admin', 'sales_rep', 'sales_manager', 'finance'] },
+  { name: 'Subscriptions', href: '/subscriptions', roles: ['admin', 'sales_rep', 'sales_manager', 'finance'] },
+  { name: 'Invoices', href: '/invoices', roles: ['admin', 'sales_manager', 'finance'] },
+  { name: 'Deal Health', href: '/deal-health', roles: ['admin', 'sales_manager', 'finance'] },
+  { name: 'Reports', href: '/reports', roles: ['admin', 'sales_manager', 'finance'] },
+  { name: 'Products', href: '/products', roles: ['admin', 'sales_rep', 'sales_manager', 'finance'] },
+  { name: 'Customer Portal', href: '/portal', roles: ['admin', 'sales_rep', 'sales_manager', 'finance'] },
 ];
 
 export function AppHeader() {
@@ -29,7 +29,7 @@ export function AppHeader() {
           DealFlow360
         </Link>
         <nav className="flex items-center space-x-1 shrink-0">
-          {NAV_TABS.map((tab) => {
+          {NAV_TABS.filter((tab) => user && tab.roles.includes(user.role)).map((tab) => {
             const isActive =
               tab.href === '/'
                 ? pathname === '/'

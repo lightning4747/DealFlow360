@@ -19,6 +19,7 @@ import {
   WebhookEventPayloadDto,
 } from '@dealflow360/types';
 import { BillingService } from '../billing/billing.service';
+import { Public } from '../auth/decorators/auth.decorator';
 
 @Controller('payments')
 export class PaymentsController {
@@ -81,6 +82,7 @@ export class PaymentsController {
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   @UseGuards(WebhookSignatureGuard)
+  @Public()
   async handleWebhook(@Body() rawBody: any) {
     const parsed = WebhookEventPayloadSchema.safeParse(rawBody);
     if (!parsed.success) {

@@ -6,6 +6,7 @@ import Redis from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 import { DRIZZLE_DB } from '../database/database.module';
 import * as schema from '@dealflow360/database';
+import { Public } from '../auth/decorators/auth.decorator';
 
 @Controller('health')
 export class HealthController {
@@ -32,6 +33,7 @@ export class HealthController {
    * Shallow liveness check: verifies process is alive and accepting traffic
    */
   @Get()
+  @Public()
   getLiveness(@Res() res: Response) {
     return res.status(HttpStatus.OK).json({
       status: 'ok',
@@ -44,6 +46,7 @@ export class HealthController {
    * Deep readiness check: verifies database, redis, and critical subsystems
    */
   @Get('ready')
+  @Public()
   async getReadiness(@Res() res: Response) {
     const checks: Record<string, { status: 'up' | 'down'; latencyMs?: number; error?: string }> = {};
     let isHealthy = true;

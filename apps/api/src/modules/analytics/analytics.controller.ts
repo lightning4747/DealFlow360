@@ -1,10 +1,15 @@
-import { Controller, Get, Query, Headers, BadRequestException, Inject } from '@nestjs/common';
+import { Controller, Get, Query, Headers, BadRequestException, Inject, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/auth.decorator';
 import { AnalyticsService } from './analytics.service';
 import { AnomalyDetectionService } from './anomaly-detection.service';
 import { StalledDealsService } from './stalled-deals.service';
 import { QueryAnalyticsDtoSchema } from '@dealflow360/types';
 
 @Controller('analytics')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin', 'sales_manager', 'finance')
 export class AnalyticsController {
   constructor(
     @Inject(AnalyticsService) private readonly analyticsService: AnalyticsService,
