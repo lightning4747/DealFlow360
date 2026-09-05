@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import * as schema from '@dealflow360/database';
+import { DRIZZLE_DB } from '../database/database.module';
 import { StalledDealDto } from '@dealflow360/types';
 
 @Injectable()
@@ -9,7 +10,7 @@ export class StalledDealsService {
   private readonly logger = new Logger(StalledDealsService.name);
 
   constructor(
-    @Inject('DRIZZLE_ORM')
+    @Inject(DRIZZLE_DB)
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 

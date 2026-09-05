@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import * as schema from '@dealflow360/database';
+import { DRIZZLE_DB } from '../database/database.module';
 import { RepDiscountAnomalyDto, DealHealthAnomalySeverity } from '@dealflow360/types';
 
 @Injectable()
@@ -9,7 +10,7 @@ export class AnomalyDetectionService {
   private readonly logger = new Logger(AnomalyDetectionService.name);
 
   constructor(
-    @Inject('DRIZZLE_ORM')
+    @Inject(DRIZZLE_DB)
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
@@ -50,7 +51,6 @@ export class AnomalyDetectionService {
 
       // If we have insufficient historical samples or zero variance, evaluate relative to baseline
       if (count < 3 || stddev === 0) {
-        // Fallback default: if standard deviation is 0 but discount exceeds mean by > 15%, warn
         if (currentDiscountPercentage > mean + 15) {
           severity = 'WARNING';
           zScore = 2.1;
@@ -100,7 +100,6 @@ export class AnomalyDetectionService {
    */
   async getActiveDiscountAnomalies(): Promise<RepDiscountAnomalyDto[]> {
     try {
-      // Find reps who gave discounts in the last 7 days exceeding 2 standard deviations
       const result = await this.db.execute(sql`
         WITH rep_stats AS (
           SELECT 
