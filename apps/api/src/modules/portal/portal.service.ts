@@ -52,6 +52,10 @@ export class PortalService {
     if (!quote) {
       throw new NotFoundException('Quote not found');
     }
+    const [customer] = await this.db.select({ email: customers.email }).from(customers).where(eq(customers.id, quote.customerId));
+    if (!customer || customer.email.toLowerCase() !== session.email.toLowerCase()) {
+      throw new BadRequestException('Portal session is not authorized for this quote');
+    }
 
     // 3. Fetch Lines (Sanitized: NO unitCost or internal margins exposed)
     const lines = await this.db
@@ -106,6 +110,13 @@ export class PortalService {
     const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, session.quoteId));
     if (!quote) {
       throw new NotFoundException('Quote not found');
+    }
+    const [customer] = await this.db.select({ email: customers.email }).from(customers).where(eq(customers.id, quote.customerId));
+    if (!customer || customer.email.toLowerCase() !== session.email.toLowerCase()) {
+      throw new BadRequestException('Portal session is not authorized for this quote');
+    }
+    if (quote.status !== 'sent' && quote.status !== 'under_negotiation') {
+      throw new BadRequestException(`Quote cannot accept a counter proposal in status '${quote.status}'`);
     }
 
     const counterDiscount = dto.counterDiscountPct;

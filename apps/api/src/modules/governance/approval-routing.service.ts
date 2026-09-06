@@ -36,6 +36,10 @@ export class ApprovalRoutingService {
       throw new NotFoundException(`Quote with ID ${quoteId} not found`);
     }
 
+    if (actor.role === 'sales_rep' && quote.repId !== actor.id) {
+      throw new ForbiddenException('Sales representatives may only submit their own quotes');
+    }
+
     if (quote.status !== 'draft' && quote.status !== 'under_negotiation') {
       throw new BadRequestException(`Quote cannot be submitted in status '${quote.status}'. Only draft or under_negotiation quotes can be submitted.`);
     }
@@ -438,7 +442,7 @@ export class ApprovalRoutingService {
         throw new BadRequestException('A non-empty rejection reason of at least 10 characters is mandatory.');
       }
 
-      // Mark step rejected, approval rejected, and revert quote to draft or rejected
+      // Rejection returns the quote to draft so the owner can revise and resubmit it.
       await this.db.transaction(async (tx: any) => {
         const [claimedStep] = await tx
           .update(approvalSteps)
@@ -456,7 +460,7 @@ export class ApprovalRoutingService {
         const [updatedApproval] = await tx
           .update(approvals)
           .set({
-            status: 'rejected',
+            status: 'draft',
             updatedAt: new Date(),
           })
           .where(and(eq(approvals.id, approvalId), eq(approvals.status, 'pending')));
@@ -483,7 +487,7 @@ export class ApprovalRoutingService {
             actorId: actor.id,
             actorRole: actor.role,
             stateBefore: { status: 'pending', step: activeStep.stepOrder },
-            stateAfter: { status: 'rejected', reason: reason.trim() },
+            stateAfter: { status: 'draft', reason: reason.trim() },
             metadata: { quoteId: appr.quoteId },
           },
           tx,
@@ -515,7 +519,7 @@ export class ApprovalRoutingService {
       return {
         approvalId,
         status: 'rejected',
-        quoteStatus: 'rejected',
+        quoteStatus: 'draft',
         message: 'Approval request rejected and returned with feedback.',
       };
     }
