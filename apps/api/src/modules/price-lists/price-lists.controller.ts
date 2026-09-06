@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Inject } from '@nestjs/common';
 import { PriceListsService } from './price-lists.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -8,7 +8,7 @@ import { CreatePriceListSchema, BulkPriceListItemsSchema } from '@dealflow360/ty
 @Controller('api/v1/sales/price-lists')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PriceListsController {
-  constructor(private readonly priceListsService: PriceListsService) {}
+  constructor(@Inject(PriceListsService) private readonly priceListsService: PriceListsService) {}
 
   @Post()
   @Roles('admin', 'finance')

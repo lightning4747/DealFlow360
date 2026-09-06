@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Inject,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -20,7 +21,7 @@ import { CreateProductSchema, UpdateProductSchema } from '@dealflow360/types';
 @Controller('api/v1/sales/products')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(@Inject(ProductsService) private readonly productsService: ProductsService) {}
 
   @Post()
   @Roles('admin')

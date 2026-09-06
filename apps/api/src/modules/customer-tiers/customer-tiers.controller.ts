@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards, Inject } from '@nestjs/common';
 import { CustomerTiersService } from './customer-tiers.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -8,7 +8,7 @@ import { CreateCustomerTierSchema } from '@dealflow360/types';
 @Controller('api/v1/sales/customer-tiers')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class CustomerTiersController {
-  constructor(private readonly tiersService: CustomerTiersService) {}
+  constructor(@Inject(CustomerTiersService) private readonly tiersService: CustomerTiersService) {}
 
   @Post()
   @Roles('admin')

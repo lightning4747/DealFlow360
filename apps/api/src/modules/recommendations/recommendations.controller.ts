@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Inject } from '@nestjs/common';
 import { RecommendationsService } from './recommendations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -8,7 +8,7 @@ import { QueryRecommendationsSchema } from '@dealflow360/types';
 @Controller('api/v1/sales/recommendations')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RecommendationsController {
-  constructor(private readonly recService: RecommendationsService) {}
+  constructor(@Inject(RecommendationsService) private readonly recService: RecommendationsService) {}
 
   @Post()
   @Roles('sales_rep')
