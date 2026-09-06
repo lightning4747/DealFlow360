@@ -130,6 +130,9 @@ export default function InvoicesPage() {
         headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to download invoice PDF`);
+      if (!res.headers.get('content-type')?.includes('application/pdf')) {
+        throw new Error('Invoice service returned an invalid document response');
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
