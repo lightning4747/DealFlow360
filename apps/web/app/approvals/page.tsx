@@ -162,7 +162,7 @@ export default function ApprovalsPage() {
                 : 'bg-transparent text-gray-400 border-[#333] hover:text-white'
             }`}
           >
-            {approvals.filter((a) => a.status === 'rejected').length} Rejected
+            Rejected
           </button>
         </div>
 
