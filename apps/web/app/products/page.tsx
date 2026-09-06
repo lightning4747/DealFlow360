@@ -1,136 +1,158 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppHeader } from '@/components/app-header';
+import { API_BASE_URL, getAuthHeaders } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 
-import { getAuthHeaders, API_BASE_URL } from '@/lib/api-client';
-
-interface ProductItem {
+interface Product {
   id: string;
+  sku: string;
   name: string;
   category: string;
-  variants: string;
-  price: string;
+  basePrice: number;
   unit: string;
-  tax: string;
-  status: string;
+  taxRate: number;
+  isActive: boolean;
+}
+
+interface PriceList {
+  id: string;
+  name: string;
+  effectiveDate: string;
 }
 
 export default function ProductsPage() {
-  const { user, isLoading: authLoading } = useAuth();
-  const [products, setProducts] = useState<ProductItem[]>([]);
+  const { isLoading: authLoading } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [priceLists, setPriceLists] = useState<PriceList[]>([]);
   const [loading, setLoading] = useState(true);
-  const [priceListCount, setPriceListCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function load() {
-      if (authLoading) return;
+    if (authLoading) return;
+
+    const loadCatalog = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
         const headers = getAuthHeaders();
-        const [productsRes, priceListsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/sales/products?limit=50`, { headers }),
+        const [productsResponse, priceListsResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/sales/products?limit=100`, { headers }),
           fetch(`${API_BASE_URL}/sales/price-lists`, { headers }),
         ]);
-        if (!productsRes.ok) throw new Error(`Failed to load products (HTTP ${productsRes.status})`);
-        const productsJson = await productsRes.json();
-        const list = productsJson.data || [];
-        setProducts(list.map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              category: p.category,
-              variants: p.sku || 'Standard',
-              price: `$${parseFloat(p.basePrice || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-              unit: p.unit || 'Each',
-              tax: `${p.taxRate || 0}%`,
-              status: p.isActive ? 'Active' : 'Inactive',
-            }))
-        );
-        if (priceListsRes.ok) {
-          const priceListsJson = await priceListsRes.json();
-          setPriceListCount((priceListsJson.data || []).length);
+
+        if (!productsResponse.ok || !priceListsResponse.ok) {
+          throw new Error(
+            `Catalog request failed (products: HTTP ${productsResponse.status}, price lists: HTTP ${priceListsResponse.status})`,
+          );
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load products');
+
+        const [productsPayload, priceListsPayload] = await Promise.all([
+          productsResponse.json(),
+          priceListsResponse.json(),
+        ]);
+
+        setProducts(productsPayload.data || []);
+        setPriceLists(priceListsPayload.data || []);
+      } catch (loadError: any) {
+        setProducts([]);
+        setPriceLists([]);
+        setError(loadError.message || 'Unable to load catalog data');
       } finally {
         setLoading(false);
       }
-    }
-    load();
+    };
+
+    loadCatalog();
   }, [authLoading]);
 
   return (
     <div className="min-h-screen bg-black text-white">
       <AppHeader />
-      <main className="max-w-6xl mx-auto p-8 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">Product Catalog</h1>
-            <p className="text-xs text-gray-400 mt-1">Every product, variant, and price list in one place.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {user?.role === 'admin' && (
-              <>
-                <button className="px-3 py-1.5 rounded text-xs font-semibold bg-white text-black hover:bg-gray-200 transition">
-                  + New Product
-                </button>
-                <button className="px-3 py-1.5 rounded text-xs font-medium border border-[#333] text-gray-300 hover:bg-[#1a1a1a] transition">
-                  Manage Price Fields
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+      <main className="mx-auto max-w-6xl space-y-6 p-8">
+        <header>
+          <h1 className="text-xl font-bold tracking-tight">Product Catalog</h1>
+          <p className="mt-1 text-xs text-gray-400">Products and pricing configured in the backend.</p>
+        </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-lg border border-[#222] bg-[#0f0f0f]">
-            <div className="text-xs text-gray-400">Total Products</div>
-            <div className="text-lg font-bold text-white mt-1">{products.filter((p) => p.status === 'Active').length} active, {products.filter((p) => p.status !== 'Active').length} inactive</div>
+        {loading && <p className="text-xs text-gray-400">Loading catalog...</p>}
+        {error && (
+          <div className="rounded border border-rose-900 bg-rose-950/30 p-4 text-xs text-rose-300">
+            {error}
           </div>
-          <div className="p-4 rounded-lg border border-[#222] bg-[#0f0f0f]">
-            <div className="text-xs text-gray-400">Price Lists</div>
-            <div className="text-lg font-bold text-white mt-1">{priceListCount} configured</div>
-          </div>
-          <div className="p-4 rounded-lg border border-[#222] bg-[#0f0f0f]">
-            <div className="text-xs text-gray-400">Variants</div>
-            <div className="text-lg font-bold text-white mt-1">{products.length} catalog SKUs</div>
-          </div>
-        </div>
+        )}
 
-        {/* Products Table */}
-        {loading && <div className="text-xs text-gray-400">Loading products...</div>}
-        {error && <div className="p-4 border border-rose-900 bg-rose-950/30 rounded text-xs text-rose-300">{error}</div>}
-        <div className="border border-[#222] rounded-lg overflow-hidden bg-[#0d0d0d]">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-[#222] bg-[#141414] text-gray-400 uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4 font-medium">Product Name</th>
-                <th className="py-3 px-4 font-medium">Category</th>
-                <th className="py-3 px-4 font-medium">Variants</th>
-                <th className="py-3 px-4 font-medium">Price</th>
-                <th className="py-3 px-4 font-medium">Unit</th>
-                <th className="py-3 px-4 font-medium">Tax</th>
-                <th className="py-3 px-4 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#1e1e1e]">
-              {products.map((p) => (
-                <tr key={p.id} className="hover:bg-[#181818] transition-colors cursor-pointer">
-                  <td className="py-3 px-4 font-medium text-white">{p.name}</td>
-                  <td className="py-3 px-4 text-gray-400">{p.category}</td>
-                  <td className="py-3 px-4 text-gray-400">{p.variants}</td>
-                  <td className="py-3 px-4 font-mono text-white">{p.price}</td>
-                  <td className="py-3 px-4 text-gray-400">{p.unit}</td>
-                  <td className="py-3 px-4 text-gray-400">{p.tax}</td>
-                  <td className="py-3 px-4 text-gray-300">{p.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {!loading && !error && (
+          <>
+            <section className="space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Products ({products.length})
+              </h2>
+              {products.length === 0 ? (
+                <p className="rounded border border-[#222] bg-[#0e0e0e] p-8 text-center text-xs text-gray-500">
+                  The backend returned no products.
+                </p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-[#222] bg-[#0d0d0d]">
+                  <table className="w-full border-collapse text-left text-xs">
+                    <thead className="bg-[#141414] text-[11px] uppercase tracking-wider text-gray-400">
+                      <tr>
+                        <th className="border-b border-[#222] px-4 py-3">Name</th>
+                        <th className="border-b border-[#222] px-4 py-3">SKU</th>
+                        <th className="border-b border-[#222] px-4 py-3">Category</th>
+                        <th className="border-b border-[#222] px-4 py-3">Base price</th>
+                        <th className="border-b border-[#222] px-4 py-3">Unit</th>
+                        <th className="border-b border-[#222] px-4 py-3">Tax rate</th>
+                        <th className="border-b border-[#222] px-4 py-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1e1e1e]">
+                      {products.map((product) => (
+                        <tr key={product.id} className="hover:bg-[#181818]">
+                          <td className="px-4 py-3 font-medium">{product.name}</td>
+                          <td className="px-4 py-3 font-mono text-gray-400">{product.sku}</td>
+                          <td className="px-4 py-3 text-gray-400">{product.category}</td>
+                          <td className="px-4 py-3 font-mono">
+                            {product.basePrice.toLocaleString(undefined, {
+                              style: 'currency',
+                              currency: 'USD',
+                            })}
+                          </td>
+                          <td className="px-4 py-3 text-gray-400">{product.unit}</td>
+                          <td className="px-4 py-3 text-gray-400">{product.taxRate}%</td>
+                          <td className="px-4 py-3 text-gray-300">{product.isActive ? 'Active' : 'Inactive'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Price lists ({priceLists.length})
+              </h2>
+              {priceLists.length === 0 ? (
+                <p className="rounded border border-[#222] bg-[#0e0e0e] p-6 text-xs text-gray-500">
+                  The backend returned no price lists.
+                </p>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {priceLists.map((priceList) => (
+                    <article key={priceList.id} className="rounded-lg border border-[#222] bg-[#0e0e0e] p-4">
+                      <h3 className="text-sm font-medium">{priceList.name}</h3>
+                      <p className="mt-1 text-xs text-gray-400">
+                        Effective {new Date(priceList.effectiveDate).toLocaleDateString()}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </main>
     </div>
   );
