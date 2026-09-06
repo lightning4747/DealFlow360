@@ -22,6 +22,12 @@ Remaining mock surfaces are tracked separately and must be removed page by page;
 
 This slice also removed fabricated product fallback rows, approval fallback rows and offline approval success, client-side quote calculation fallback, and hardcoded portal comments/presence/socket identity. Failed API calls now show empty/error states instead of pretending persisted data exists.
 
+Follow-up completed:
+
+- Dashboard counts now derive from authenticated quote, approval, and deal-health API responses instead of fixed numbers or fabricated activity.
+- Product summary tiles now derive from the catalog and price-list APIs; no static product counts remain.
+- Fulfillment, dashboard, and product pages now show loading/error/empty states when backend data is unavailable rather than substituting mock records.
+
 ### Workstream 2 — Seed deterministic end-to-end scenarios
 
 Scope: provide repeatable records for quotation, approval, inventory split/backorder, one-time invoice, recurring subscription, and billing schedule testing. Seed records use stable business identifiers and are safe to rerun without accumulating duplicate schedules or fulfillment plans.

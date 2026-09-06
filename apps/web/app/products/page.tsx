@@ -18,21 +18,27 @@ interface ProductItem {
 }
 
 export default function ProductsPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [priceListCount, setPriceListCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
+      if (authLoading) return;
       try {
-        const res = await fetch(`${API_BASE_URL}/sales/products?limit=50`, {
-          headers: getAuthHeaders(),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          const list = json.data || [];
-          setProducts(
-            list.map((p: any) => ({
+        setLoading(true);
+        setError(null);
+        const headers = getAuthHeaders();
+        const [productsRes, priceListsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/sales/products?limit=50`, { headers }),
+          fetch(`${API_BASE_URL}/sales/price-lists`, { headers }),
+        ]);
+        if (!productsRes.ok) throw new Error(`Failed to load products (HTTP ${productsRes.status})`);
+        const productsJson = await productsRes.json();
+        const list = productsJson.data || [];
+        setProducts(list.map((p: any) => ({
               id: p.id,
               name: p.name,
               category: p.category,
@@ -42,19 +48,19 @@ export default function ProductsPage() {
               tax: `${p.taxRate || 0}%`,
               status: p.isActive ? 'Active' : 'Inactive',
             }))
-          );
-        } else {
-          throw new Error(`Failed to load products (HTTP ${res.status})`);
+        );
+        if (priceListsRes.ok) {
+          const priceListsJson = await priceListsRes.json();
+          setPriceListCount((priceListsJson.data || []).length);
         }
-      } catch (err) {
-        console.error('Failed to load products:', err);
-        setProducts([]);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load products');
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, []);
+  }, [authLoading]);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -79,23 +85,24 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        {/* 3 Metric Tiles from PNG Screen 16 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-lg border border-[#222] bg-[#0f0f0f]">
             <div className="text-xs text-gray-400">Total Products</div>
-            <div className="text-lg font-bold text-white mt-1">124 active, 6 archived</div>
+            <div className="text-lg font-bold text-white mt-1">{products.filter((p) => p.status === 'Active').length} active, {products.filter((p) => p.status !== 'Active').length} inactive</div>
           </div>
           <div className="p-4 rounded-lg border border-[#222] bg-[#0f0f0f]">
             <div className="text-xs text-gray-400">Price Lists</div>
-            <div className="text-lg font-bold text-white mt-1">3 tiers, 2 currencies</div>
+            <div className="text-lg font-bold text-white mt-1">{priceListCount} configured</div>
           </div>
           <div className="p-4 rounded-lg border border-[#222] bg-[#0f0f0f]">
             <div className="text-xs text-gray-400">Variants</div>
-            <div className="text-lg font-bold text-white mt-1">340 SKUs across all products</div>
+            <div className="text-lg font-bold text-white mt-1">{products.length} catalog SKUs</div>
           </div>
         </div>
 
         {/* Products Table */}
+        {loading && <div className="text-xs text-gray-400">Loading products...</div>}
+        {error && <div className="p-4 border border-rose-900 bg-rose-950/30 rounded text-xs text-rose-300">{error}</div>}
         <div className="border border-[#222] rounded-lg overflow-hidden bg-[#0d0d0d]">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
