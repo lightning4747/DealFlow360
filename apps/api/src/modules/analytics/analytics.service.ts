@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, InternalServerErrorException } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import * as schema from '@dealflow360/database';
@@ -34,18 +34,12 @@ export class AnalyticsService {
       this.anomalyService.getActiveDiscountAnomalies(),
     ]);
 
-    let activeQuotesCount = 0;
-    try {
-      const countRes = await this.db.execute(sql`
-        SELECT COUNT(*)::int as count
-        FROM deal_studio.quotes
-        WHERE tenant_id = ${tenantId}
-          AND status NOT IN ('CONVERTED', 'CLOSED_LOST', 'EXPIRED')
-      `);
-      activeQuotesCount = Number(countRes.rows[0]?.count || 0);
-    } catch (err: any) {
-      this.logger.warn(`Could not count active quotes: ${err.message}`);
-    }
+    const countRes = await this.db.execute(sql`
+      SELECT COUNT(*)::int as count
+      FROM sales.quotes
+      WHERE status NOT IN ('fulfilled', 'cancelled')
+    `);
+    const activeQuotesCount = Number(countRes.rows[0]?.count || 0);
 
     let score = 100;
     score -= stalledDeals.length * 5;
@@ -92,8 +86,8 @@ export class AnalyticsService {
         averageCycleHours: 4.5,
       }));
     } catch (err: any) {
-      this.logger.warn(`Velocity metrics fallback: ${err.message}`);
-      return [];
+      this.logger.error(`Could not load velocity metrics: ${err.message}`);
+      throw new InternalServerErrorException('Analytics velocity data is unavailable');
     }
   }
 
@@ -108,6 +102,7 @@ export class AnalyticsService {
       `);
     } catch (err: any) {
       this.logger.error(`Error recording rep discount: ${err.message}`);
+      throw new InternalServerErrorException('Discount analytics data is unavailable');
     }
   }
 }

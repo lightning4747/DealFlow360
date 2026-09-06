@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, InternalServerErrorException } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import * as schema from '@dealflow360/database';
@@ -17,8 +17,7 @@ export class StalledDealsService {
   /**
    * Scans for quotes in non-terminal states that have had no updates/activity
    * for more than thresholdDays (default 7 days).
-   * Non-terminal states: DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, SENT
-   * Terminal states: CONVERTED, CLOSED_LOST, EXPIRED
+   * Terminal states in the live sales schema are fulfilled and cancelled.
    */
   async findStalledDeals(thresholdDays: number = 7, tenantId?: string): Promise<StalledDealDto[]> {
     try {
@@ -28,18 +27,17 @@ export class StalledDealsService {
         SELECT 
           q.id as quote_id,
           q.quote_number,
-          q.account_id,
+          q.customer_id as account_id,
           a.name as account_name,
           q.rep_id,
           q.status,
           q.total_amount::float as total_amount,
           COALESCE(q.updated_at, q.created_at) as last_activity_at,
           EXTRACT(DAY FROM (NOW() - COALESCE(q.updated_at, q.created_at)))::int as inactive_days
-        FROM deal_studio.quotes q
-        LEFT JOIN master_data.accounts a ON q.account_id = a.id
-        WHERE q.status NOT IN ('CONVERTED', 'CLOSED_LOST', 'EXPIRED')
+        FROM sales.quotes q
+        LEFT JOIN sales.customers a ON q.customer_id = a.id
+        WHERE q.status NOT IN ('fulfilled', 'cancelled')
           AND COALESCE(q.updated_at, q.created_at) < NOW() - ${daysInterval}::interval
-          ${tenantId ? sql`AND q.tenant_id = ${tenantId}` : sql``}
         ORDER BY inactive_days DESC, total_amount DESC
         LIMIT 100;
       `);
@@ -58,7 +56,7 @@ export class StalledDealsService {
         return {
           quoteId: row.quote_id,
           quoteNumber: row.quote_number || 'UNKNOWN',
-          accountId: row.account_id,
+          accountId: row.account_id || row.customer_id,
           accountName: row.account_name || 'Unknown Account',
           repId: row.rep_id,
           status: row.status,
@@ -70,7 +68,7 @@ export class StalledDealsService {
       });
     } catch (err: any) {
       this.logger.error(`Error finding stalled deals: ${err.message}`);
-      return [];
+      throw new InternalServerErrorException('Stalled deal data is unavailable');
     }
   }
 }
