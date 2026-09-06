@@ -9,6 +9,7 @@ import {
   UseGuards,
   Req,
   Inject,
+  Res,
 } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { OrderBifurcationService } from './order-bifurcation.service';
@@ -69,6 +70,16 @@ export class BillingController {
   async getInvoice(@Param('id') id: string) {
     const data = await this.billingService.getInvoiceById(id);
     return { data, meta: null, error: null };
+  }
+
+  @Get('internal/invoices/:id/pdf')
+  @Roles('admin', 'finance', 'sales_manager', 'sales_rep')
+  async downloadInvoicePdf(@Param('id') id: string, @Res({ passthrough: true }) response: any) {
+    const document = await this.billingService.generateInvoicePdf(id);
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
+    response.setHeader('Content-Length', document.content.length);
+    return document.content;
   }
 
   @Post('internal/invoices/:id/send')

@@ -56,6 +56,7 @@ export default function InvoicesPage() {
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [voidActionLoading, setVoidActionLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   useEffect(() => {
     if (!authLoading) fetchInvoices();
@@ -118,6 +119,28 @@ export default function InvoicesPage() {
       alert(err.message);
     } finally {
       setVoidActionLoading(false);
+    }
+  };
+
+  const downloadInvoicePdf = async () => {
+    if (!selectedInvoice) return;
+    try {
+      setPdfLoading(true);
+      const res = await fetch(`${API_BASE_URL}/internal/invoices/${selectedInvoice.id}/pdf`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to download invoice PDF`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${selectedInvoice.invoiceNumber}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setPdfLoading(false);
     }
   };
 
@@ -331,10 +354,11 @@ export default function InvoicesPage() {
               <div className="flex items-center justify-between border-t border-[#222] pt-4">
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => alert(`Invoice ${selectedInvoice.invoiceNumber} PDF downloaded.`)}
+                    onClick={downloadInvoicePdf}
+                    disabled={pdfLoading}
                     className="px-3 py-1.5 rounded text-xs bg-white text-black font-semibold hover:bg-gray-200 transition"
                   >
-                    Download PDF
+                    {pdfLoading ? 'Preparing PDF...' : 'Download PDF'}
                   </button>
                 </div>
                 {selectedInvoice.status !== 'paid' && selectedInvoice.status !== 'voided' && (

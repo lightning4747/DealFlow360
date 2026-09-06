@@ -189,6 +189,61 @@ export class BillingService {
     };
   }
 
+  async generateInvoicePdf(id: string): Promise<{ filename: string; content: Buffer }> {
+    const invoice = await this.getInvoiceById(id);
+    const escapePdfText = (value: string) => value.replace(/([\\()])/g, '\\$1');
+    const lines = [
+      `Invoice ${invoice.invoiceNumber}`,
+      `Customer: ${invoice.customerName || invoice.customerId}`,
+      `Status: ${invoice.status}`,
+      `Currency: ${invoice.currency}`,
+      `Issued: ${invoice.issuedAt ? new Date(invoice.issuedAt).toISOString().slice(0, 10) : 'N/A'}`,
+      `Due: ${invoice.dueDate ? new Date(invoice.dueDate).toISOString().slice(0, 10) : 'N/A'}`,
+      '',
+      'Items:',
+      ...invoice.items.map(
+        (item: {
+          description: string;
+          quantity: number;
+          unitPrice: string;
+          totalPrice: string;
+        }) =>
+          `${item.description} | Qty ${item.quantity} | Unit ${item.unitPrice} | Total ${item.totalPrice}`,
+      ),
+      '',
+      `Subtotal: ${invoice.subtotal}`,
+      `Discount: ${invoice.discountAmount}`,
+      `Tax: ${invoice.taxAmount}`,
+      `Total: ${invoice.totalAmount} ${invoice.currency}`,
+    ];
+    const stream = `BT\n/F1 11 Tf\n50 760 Td\n${lines
+      .map((line) => `(${escapePdfText(line)}) Tj 0 -16 Td`)
+      .join('\n')}\nET`;
+    const objects = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+      `<< /Length ${Buffer.byteLength(stream, 'utf8')} >>\nstream\n${stream}\nendstream`,
+    ];
+    let pdf = '%PDF-1.4\n';
+    const offsets: number[] = [0];
+    objects.forEach((object, index) => {
+      offsets[index + 1] = Buffer.byteLength(pdf, 'utf8');
+      pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    });
+    const xrefOffset = Buffer.byteLength(pdf, 'utf8');
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    for (let index = 1; index <= objects.length; index += 1) {
+      pdf += `${String(offsets[index]).padStart(10, '0')} 00000 n \n`;
+    }
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+    return {
+      filename: `${invoice.invoiceNumber}.pdf`,
+      content: Buffer.from(pdf, 'utf8'),
+    };
+  }
+
   async voidInvoice(id: string, dto: VoidInvoiceDto, actor?: { id?: string }) {
     const [invoice] = await this.db.select().from(invoices).where(eq(invoices.id, id));
     if (!invoice) {
