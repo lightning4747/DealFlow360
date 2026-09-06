@@ -18,7 +18,19 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   const port = process.env.PORT || 3000;
-  await app.listen(port);
+  try {
+    await app.listen(port);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+      logger.warn(
+        `API port ${port} is already in use. Reusing the existing API process instead of crashing.`,
+        'Bootstrap',
+      );
+      await app.close();
+      return;
+    }
+    throw error;
+  }
   logger.log(`DealFlow360 API listening on port ${port}`, 'Bootstrap');
 }
 
