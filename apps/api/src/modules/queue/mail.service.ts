@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer, { Transporter } from 'nodemailer';
 import { EmailNotificationJobPayload } from './queue.types';
@@ -8,19 +8,19 @@ export class MailService {
   private readonly transporter?: Transporter;
   private readonly from: string;
 
-  constructor(config: ConfigService) {
-    const host = config.get<string>('SMTP_HOST');
-    const user = config.get<string>('SMTP_USER');
-    const password = config.get<string>('SMTP_PASSWORD');
+  constructor(@Optional() config?: ConfigService) {
+    const host = config?.get<string>('SMTP_HOST') || process.env.SMTP_HOST;
+    const user = config?.get<string>('SMTP_USER') || process.env.SMTP_USER;
+    const password = config?.get<string>('SMTP_PASSWORD') || process.env.SMTP_PASSWORD;
     if (!host || !user || !password) {
       this.from = user || '';
       return;
     }
-    this.from = config.get<string>('MAIL_FROM') || user;
+    this.from = config?.get<string>('MAIL_FROM') || process.env.MAIL_FROM || user;
     this.transporter = nodemailer.createTransport({
       host,
-      port: Number(config.get<string>('SMTP_PORT') || 587),
-      secure: config.get<string>('SMTP_SECURE') === 'true',
+      port: Number(config?.get<string>('SMTP_PORT') || process.env.SMTP_PORT || 587),
+      secure: (config?.get<string>('SMTP_SECURE') || process.env.SMTP_SECURE) === 'true',
       auth: { user, pass: password },
     });
   }
