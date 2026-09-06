@@ -7,7 +7,7 @@ import { AnomalyDetectionService } from './anomaly-detection.service';
 import { StalledDealsService } from './stalled-deals.service';
 import { QueryAnalyticsDtoSchema } from '@dealflow360/types';
 
-@Controller('analytics')
+@Controller('api/v1/analytics')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'sales_manager', 'finance')
 export class AnalyticsController {

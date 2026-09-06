@@ -34,12 +34,13 @@ export class AnalyticsService {
       this.anomalyService.getActiveDiscountAnomalies(),
     ]);
 
-    const countRes = await this.db.execute(sql`
+    const countRes: any = await this.db.execute(sql`
       SELECT COUNT(*)::int as count
       FROM sales.quotes
       WHERE status NOT IN ('fulfilled', 'cancelled')
     `);
-    const activeQuotesCount = Number(countRes.rows[0]?.count || 0);
+    const rows = countRes.rows || (Array.isArray(countRes) ? countRes : []);
+    const activeQuotesCount = Number(rows[0]?.count || 0);
 
     let score = 100;
     score -= stalledDeals.length * 5;

@@ -35,8 +35,10 @@ export default function DashboardPage() {
       }
       const healthRes = await fetch(`${API_BASE_URL}/analytics/deal-health`, { headers });
       if (!healthRes.ok) throw new Error(`Dashboard data unavailable (HTTP ${healthRes.status})`);
-      const data = await healthRes.json();
-      setHealthCount(Array.isArray(data?.data?.alerts) ? data.data.alerts.length : Array.isArray(data?.alerts) ? data.alerts.length : 0);
+      const healthData = await healthRes.json();
+      const payload = healthData?.data || healthData;
+      const atRiskAlerts = (payload?.stalledDealsCount || 0) + (payload?.anomaliesDetectedCount || 0);
+      setHealthCount(atRiskAlerts);
     };
     load().catch((error: Error) => setLoadError(error.message));
   }, [authLoading, user]);
