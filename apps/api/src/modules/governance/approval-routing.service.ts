@@ -332,10 +332,17 @@ export class ApprovalRoutingService {
       const activeStep = steps.find((s: any) => s.stepOrder === app.currentApprovalStep) || steps[0];
       const canAct = user.role !== 'admin' && activeStep?.roleRequired === user.role && app.status === 'pending';
 
+      let assignedUserName = null;
+      if (activeStep?.assignedUserId) {
+        const [assignedUserObj] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, activeStep.assignedUserId));
+        if (assignedUserObj) assignedUserName = assignedUserObj.name;
+      }
+
       results.push({
         ...app,
-        activeStep,
+        activeStep: activeStep ? { ...activeStep, assignedUserName } : null,
         assignedRole: activeStep?.roleRequired || 'sales_manager',
+        assignedUserName,
         steps,
         canAct,
       });
