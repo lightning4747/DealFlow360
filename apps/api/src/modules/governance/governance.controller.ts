@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Req, Inject } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/auth.decorator';
@@ -9,8 +9,8 @@ import { AuditLogService } from './audit-log.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class GovernanceController {
   constructor(
-    private readonly approvalService: ApprovalRoutingService,
-    private readonly auditLogService: AuditLogService,
+    @Inject(ApprovalRoutingService) private readonly approvalService: ApprovalRoutingService,
+    @Inject(AuditLogService) private readonly auditLogService: AuditLogService,
   ) {}
 
   // 1. Submit Quote for Governance Check & Approval
