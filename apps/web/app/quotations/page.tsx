@@ -30,6 +30,7 @@ const COLUMNS_DEF: ColumnDef[] = [
   { key: 'negotiation', title: 'Negotiation', statuses: ['under_negotiation', 'negotiation'] },
   { key: 'pending', title: 'Governance Approval', statuses: ['pending_approval'] },
   { key: 'confirmed', title: 'Confirmed / Ready', statuses: ['confirmed', 'approved', 'fulfilled'] },
+  { key: 'cancelled', title: 'Cancelled / Rejected', statuses: ['cancelled', 'rejected'] },
 ];
 
 export default function QuotationsPage() {
@@ -87,7 +88,7 @@ export default function QuotationsPage() {
         </div>
 
         {/* Dynamic Kanban Board */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
           {COLUMNS_DEF.map((col) => {
             const colItems = quotes.filter((q) =>
               col.statuses.includes(q.status?.toLowerCase())
