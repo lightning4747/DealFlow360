@@ -73,12 +73,8 @@ export class OrderBifurcationService {
         throw new NotFoundException(`Quote ${quoteId} not found`);
       }
 
-      if (quote.status === 'confirmed') {
-        throw new BadRequestException(`Quote ${quoteId} has already been confirmed`);
-      }
-
-      if (quote.status === 'cancelled' || quote.status === 'rejected') {
-        throw new BadRequestException(`Cannot confirm quote in '${quote.status}' status`);
+      if (quote.status !== 'sent') {
+        throw new BadRequestException(`Only sent quotes can be confirmed; current status is '${quote.status}'`);
       }
 
       // 2. Fetch lines with joined products

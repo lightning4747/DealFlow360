@@ -37,6 +37,9 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const decoded = jwt.verify(token, this.jwtSecret) as any;
+      if (decoded.type !== 'access' || typeof decoded.sub !== 'string' || !decoded.role) {
+        throw new Error('Invalid access token');
+      }
       request.user = decoded;
       return true;
     } catch (err: any) {

@@ -36,7 +36,7 @@ describe('Phase 5 Integration & Service Tests: Order Bifurcation & Invoicing Lif
       id: sampleQuoteId,
       quoteNumber: 'Q-2026-0010',
       customerId: sampleCustomerId,
-      status: 'draft',
+      status: 'sent',
       totalAmount: '15000.00',
     };
 

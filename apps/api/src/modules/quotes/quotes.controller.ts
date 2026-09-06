@@ -27,8 +27,8 @@ export class QuotesController {
 
   @Get('quotes')
   @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
-  async listQuotes() {
-    const data = await this.quotesService.findAllQuotes();
+  async listQuotes(@Req() req: any) {
+    const data = await this.quotesService.findAllQuotes(req.user);
     return { data, meta: null, error: null };
   }
 
@@ -57,8 +57,8 @@ export class QuotesController {
 
   @Get('quotes/:id')
   @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
-  async getQuote(@Param('id') id: string) {
-    const data = await this.quotesService.getQuoteById(id);
+  async getQuote(@Param('id') id: string, @Req() req: any) {
+    const data = await this.quotesService.getQuoteById(id, req.user);
     return { data, meta: null, error: null };
   }
 

@@ -1,6 +1,7 @@
 import { AuthService } from '../src/modules/auth/auth.service';
 import * as jwt from 'jsonwebtoken';
-import { sqlClient } from '@dealflow360/database';
+import { db, customers, quotes, sqlClient } from '@dealflow360/database';
+import { eq } from 'drizzle-orm';
 
 describe('Unit Test: Authentication Service, Tokens & Magic Links', () => {
   let authService: AuthService;
@@ -43,8 +44,14 @@ describe('Unit Test: Authentication Service, Tokens & Magic Links', () => {
   });
 
   it('should generate a cryptographic single-use magic link token', async () => {
-    const quoteId = '550e8400-e29b-41d4-a716-446655440099';
-    const email = 'client@enterprise.com';
+    const [customer] = await db.select().from(customers).where(eq(customers.email, 'procurement@acme.com')).limit(1);
+    const [quote] = customer
+      ? await db.select().from(quotes).where(eq(quotes.customerId, customer.id)).limit(1)
+      : [];
+    expect(customer).toBeDefined();
+    expect(quote).toBeDefined();
+    const quoteId = quote!.id;
+    const email = customer!.email;
 
     const result = await authService.generateMagicLink({ quoteId, email });
     expect(result.token).toBeDefined();

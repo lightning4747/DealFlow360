@@ -13,7 +13,8 @@ import {
   MagicLinkVerify,
 } from '@dealflow360/types';
 import { db, users, magicLinks } from '@dealflow360/database';
-import { eq, and } from 'drizzle-orm';
+import { quotes, customers } from '@dealflow360/database';
+import { eq, and, isNull } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
@@ -194,6 +195,21 @@ export class AuthService {
   }
 
   async generateMagicLink(req: MagicLinkRequest): Promise<{ token: string; expiresAt: Date }> {
+    const [quoteCustomer] = await db
+      .select({ quoteId: quotes.id, customerEmail: customers.email })
+      .from(quotes)
+      .innerJoin(customers, eq(quotes.customerId, customers.id))
+      .where(and(eq(quotes.id, req.quoteId), eq(customers.email, req.email)))
+      .limit(1);
+
+    if (!quoteCustomer) {
+      throw new UnauthorizedException({
+        code: 'PORTAL_QUOTE_ACCESS_DENIED',
+        message: 'The email address is not authorized for this quotation',
+        statusCode: 401,
+      });
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -265,11 +281,20 @@ export class AuthService {
       });
     }
 
-    // Mark token as used (single-use semantics)
-    await db
+    // Mark token as used atomically so concurrent verification cannot create two sessions.
+    const [claimedRecord] = await db
       .update(magicLinks)
       .set({ usedAt: new Date() })
-      .where(eq(magicLinks.id, record.id));
+      .where(and(eq(magicLinks.id, record.id), isNull(magicLinks.usedAt)))
+      .returning();
+
+    if (!claimedRecord) {
+      throw new UnauthorizedException({
+        code: 'MAGIC_LINK_ALREADY_USED',
+        message: 'Magic link has already been used',
+        statusCode: 401,
+      });
+    }
 
     // Sign stateless portal session JWT
     const portalToken = jwt.sign(

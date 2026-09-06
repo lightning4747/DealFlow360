@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject } from '@nestjs/common';
 import { DRIZZLE_DB } from '../database/database.module';
 import { quotes, quoteLines, lineComments, products, customers, users } from '@dealflow360/database';
 import { eq, desc, inArray, or, and } from 'drizzle-orm';
@@ -24,7 +24,9 @@ export class QuotesService {
     return this.calcService.calculate(await this.withCatalogPricing(dto));
   }
 
-  async findAllQuotes() {
+  async findAllQuotes(actor: { sub?: string; id?: string; role: string }) {
+    const actorId = actor.id || actor.sub;
+    const scope = actor.role === 'sales_rep' && actorId ? eq(quotes.repId, actorId) : undefined;
     const list = await this.db
       .select({
         id: quotes.id,
@@ -45,6 +47,7 @@ export class QuotesService {
       .from(quotes)
       .leftJoin(customers, eq(quotes.customerId, customers.id))
       .leftJoin(users, eq(quotes.repId, users.id))
+      .where(scope)
       .orderBy(desc(quotes.createdAt));
 
     return list;
@@ -84,40 +87,43 @@ export class QuotesService {
     const quoteNumber = `Q-${Date.now().toString().slice(-4)}`;
     const repId = user?.id || user?.sub;
 
-    // 3. Insert Quote
-    const [newQuote] = await this.db
-      .insert(quotes)
-      .values({
-        quoteNumber,
-        repId,
-        customerId: dto.customerId,
-        status: 'draft',
-        totalAmount: calcSummary.totalAmount.toFixed(2),
-        costTotal: calcSummary.totalCost.toFixed(2),
-        grossMarginPct: calcSummary.grossMarginPct.toFixed(2),
-        brsScore: calcSummary.brsScore.toFixed(2),
-        currentApprovalStep: 1,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      })
-      .returning();
+    const { newQuote, insertedLines } = await this.db.transaction(async (tx: any) => {
+      const [createdQuote] = await tx
+        .insert(quotes)
+        .values({
+          quoteNumber,
+          repId,
+          customerId: dto.customerId,
+          status: 'draft',
+          totalAmount: calcSummary.totalAmount.toFixed(2),
+          costTotal: calcSummary.totalCost.toFixed(2),
+          grossMarginPct: calcSummary.grossMarginPct.toFixed(2),
+          brsScore: calcSummary.brsScore.toFixed(2),
+          currentApprovalStep: 1,
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        })
+        .returning();
 
-    // 4. Insert Quote Lines
-    const linesToInsert = calcSummary.lines.map((l) => ({
-      quoteId: newQuote.id,
-      productId: l.productId,
-      variantId: l.variantId,
-      quantity: l.quantity,
-      unitPrice: l.unitPrice.toFixed(2),
-      unitCost: l.unitCost.toFixed(2),
-      discountPct: l.discountPct.toFixed(2),
-      appliedCeilingPct: l.appliedCeilingPct.toFixed(2),
-      violationScore: l.violationScore.toFixed(4),
-      lineTotal: l.lineTotal.toFixed(2),
-      grossMargin: l.lineMarginAmount.toFixed(2),
-      lineType: l.lineType as any,
-    }));
+      const linesToInsert = calcSummary.lines.map((l) => ({
+        quoteId: createdQuote.id,
+        productId: l.productId,
+        variantId: l.variantId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice.toFixed(2),
+        unitCost: l.unitCost.toFixed(2),
+        discountPct: l.discountPct.toFixed(2),
+        appliedCeilingPct: l.appliedCeilingPct.toFixed(2),
+        violationScore: l.violationScore.toFixed(4),
+        lineTotal: l.lineTotal.toFixed(2),
+        grossMargin: l.lineMarginAmount.toFixed(2),
+        lineType: l.lineType as any,
+      }));
 
-    const insertedLines = await this.db.insert(quoteLines).values(linesToInsert).returning();
+      return {
+        newQuote: createdQuote,
+        insertedLines: await tx.insert(quoteLines).values(linesToInsert).returning(),
+      };
+    });
 
     return {
       quote: newQuote,
@@ -126,7 +132,7 @@ export class QuotesService {
     };
   }
 
-  async getQuoteById(quoteId: string) {
+  async getQuoteById(quoteId: string, actor: { sub?: string; id?: string; role: string }) {
     const [quote] = await this.db
       .select({
         id: quotes.id,
@@ -152,7 +158,10 @@ export class QuotesService {
       .from(quotes)
       .leftJoin(customers, eq(quotes.customerId, customers.id))
       .leftJoin(users, eq(quotes.repId, users.id))
-      .where(or(eq(quotes.id, quoteId), eq(quotes.quoteNumber, quoteId)));
+      .where(and(
+        or(eq(quotes.id, quoteId), eq(quotes.quoteNumber, quoteId)),
+        actor.role === 'sales_rep' ? eq(quotes.repId, actor.id || actor.sub || '') : undefined,
+      ));
 
     if (!quote) {
       throw new NotFoundException(`Quote ${quoteId} not found`);
@@ -209,7 +218,7 @@ export class QuotesService {
     }
     const actorId = actor.id || actor.sub;
     if (quote.repId !== actorId) {
-      throw new BadRequestException('Only the quote owner can edit quote lines');
+      throw new ForbiddenException('Only the quote owner can edit quote lines');
     }
 
     const newQty = dto.quantity !== undefined ? dto.quantity : existingLine.quantity;
@@ -249,10 +258,18 @@ export class QuotesService {
     return updatedLine;
   }
 
-  async addLineComment(lineId: string, dto: CreateLineCommentDto, author: { id?: string; name: string; role: string }) {
+  async addLineComment(lineId: string, dto: CreateLineCommentDto, author: { id?: string; sub?: string; name: string; role: string }) {
     const [line] = await this.db.select().from(quoteLines).where(eq(quoteLines.id, lineId));
     if (!line) {
       throw new NotFoundException(`Quote line ${lineId} not found`);
+    }
+
+    const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, line.quoteId));
+    if (!quote) {
+      throw new NotFoundException(`Quote ${line.quoteId} not found`);
+    }
+    if (author.role === 'sales_rep' && quote.repId !== (author.id || author.sub)) {
+      throw new ForbiddenException('Only the quote owner can comment on quote lines');
     }
 
     const [comment] = await this.db
