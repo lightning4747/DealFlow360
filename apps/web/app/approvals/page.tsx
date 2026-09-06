@@ -49,7 +49,9 @@ export default function ApprovalsPage() {
             customer: item.customerName || 'Enterprise Customer',
             blendedRisk: item.brsScore > 15 ? 'HIGH' : item.brsScore > 8 ? 'MEDIUM' : 'LOW',
             stage: item.activeStep?.roleRequired === 'finance' ? 'Finance' : 'Sales Manager',
-            assignedTo: item.assignedUserName || item.activeStep?.assignedUserName || (item.assignedRole === 'finance' ? 'Finance Team' : 'Sales Manager'),
+            assignedTo: item.activeStep?.assignedUserId
+              ? (item.activeStep?.roleRequired === 'finance' ? 'Dave Finance' : 'Carol Manager')
+              : (item.assignedRole === 'finance' ? 'Finance' : 'Carol Manager'),
             status: item.status || 'pending',
             totalAmount: `$${Number(item.totalAmount || 0).toLocaleString()}`,
             requestedDiscount: `${item.brsScore || 0}%`,
