@@ -9,7 +9,7 @@ import { QueryAnalyticsDtoSchema } from '@dealflow360/types';
 
 @Controller('api/v1/analytics')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'sales_manager', 'finance')
+@Roles('admin', 'sales_manager', 'finance', 'sales_rep')
 export class AnalyticsController {
   constructor(
     @Inject(AnalyticsService) private readonly analyticsService: AnalyticsService,
