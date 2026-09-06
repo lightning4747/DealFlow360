@@ -71,7 +71,7 @@ export class BillingService {
 
   // ─── INVOICES ─────────────────────────────────────────────────────────────
 
-  async listInvoices(params: { customerId?: string; status?: string; page?: number; limit?: number }) {
+  async listInvoices(params: { customerId?: string; status?: string; page?: number; limit?: number; actor?: { id: string; role: string } }) {
     const page = params.page && params.page > 0 ? params.page : 1;
     const limit = params.limit && params.limit > 0 ? params.limit : 20;
     const offset = (page - 1) * limit;
@@ -82,6 +82,9 @@ export class BillingService {
     }
     if (params.status) {
       conditions.push(eq(invoices.status, params.status));
+    }
+    if (params.actor?.role === 'sales_rep') {
+      conditions.push(eq(quotes.repId, params.actor.id));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -107,6 +110,7 @@ export class BillingService {
       })
       .from(invoices)
       .leftJoin(customers, eq(invoices.customerId, customers.id))
+      .leftJoin(quotes, eq(invoices.quoteId, quotes.id))
       .where(whereClause)
       .orderBy(desc(invoices.createdAt))
       .limit(limit)
@@ -115,6 +119,7 @@ export class BillingService {
     const [countResult] = await this.db
       .select({ count: sql`count(*)` })
       .from(invoices)
+      .leftJoin(quotes, eq(invoices.quoteId, quotes.id))
       .where(whereClause);
 
     const total = Number(countResult?.count || 0);
@@ -131,7 +136,7 @@ export class BillingService {
     };
   }
 
-  async getInvoiceById(id: string) {
+  async getInvoiceById(id: string, actor?: { id: string; role: string }) {
     const [invoice] = await this.db
       .select({
         id: invoices.id,
@@ -159,6 +164,12 @@ export class BillingService {
 
     if (!invoice) {
       throw new NotFoundException(`Invoice with ID ${id} not found`);
+    }
+    if (actor?.role === 'sales_rep' && invoice.quoteId) {
+      const [quote] = await this.db.select({ repId: quotes.repId }).from(quotes).where(eq(quotes.id, invoice.quoteId));
+      if (!quote || quote.repId !== actor.id) {
+        throw new NotFoundException(`Invoice with ID ${id} not found`);
+      }
     }
 
     const lines = await this.db
@@ -189,8 +200,8 @@ export class BillingService {
     };
   }
 
-  async generateInvoicePdf(id: string): Promise<{ filename: string; content: Buffer }> {
-    const invoice = await this.getInvoiceById(id);
+  async generateInvoicePdf(id: string, actor?: { id: string; role: string }): Promise<{ filename: string; content: Buffer }> {
+    const invoice = await this.getInvoiceById(id, actor);
     const escapePdfText = (value: string) => value.replace(/([\\()])/g, '\\$1');
     const lines = [
       `Invoice ${invoice.invoiceNumber}`,

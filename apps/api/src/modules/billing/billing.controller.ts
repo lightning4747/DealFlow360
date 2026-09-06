@@ -51,6 +51,7 @@ export class BillingController {
   @Get('internal/invoices')
   @Roles('admin', 'finance', 'sales_manager', 'sales_rep')
   async listInvoices(
+    @Req() req: any,
     @Query('customer_id') customerId?: string,
     @Query('status') status?: string,
     @Query('page') page?: number,
@@ -61,14 +62,15 @@ export class BillingController {
       status,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
+      actor: req.user,
     });
     return result;
   }
 
   @Get('internal/invoices/:id/pdf')
   @Roles('admin', 'finance', 'sales_manager', 'sales_rep')
-  async downloadInvoicePdf(@Param('id') id: string, @Res() response: any): Promise<void> {
-    const document = await this.billingService.generateInvoicePdf(id);
+  async downloadInvoicePdf(@Param('id') id: string, @Res() response: any, @Req() req: any): Promise<void> {
+    const document = await this.billingService.generateInvoicePdf(id, req.user);
     response.setHeader('Content-Type', 'application/pdf');
     response.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
     response.setHeader('Content-Length', document.content.length);
@@ -77,8 +79,8 @@ export class BillingController {
 
   @Get('internal/invoices/:id')
   @Roles('admin', 'finance', 'sales_manager', 'sales_rep')
-  async getInvoice(@Param('id') id: string) {
-    const data = await this.billingService.getInvoiceById(id);
+  async getInvoice(@Param('id') id: string, @Req() req: any) {
+    const data = await this.billingService.getInvoiceById(id, req.user);
     return { data, meta: null, error: null };
   }
 
