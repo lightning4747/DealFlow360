@@ -1,6 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DRIZZLE_DB } from '../database/database.module';
-import { magicLinks, quotes, quoteLines, products, lineComments, negotiationSessions } from '@dealflow360/database';
+import {
+  magicLinks,
+  quotes,
+  quoteLines,
+  products,
+  lineComments,
+  negotiationSessions,
+  customers,
+} from '@dealflow360/database';
 import { eq, and, gt } from 'drizzle-orm';
 import { CustomerCounterProposalDto } from '@dealflow360/types';
 import { ApprovalRoutingService } from '../governance/approval-routing.service';
@@ -14,6 +22,14 @@ export class PortalService {
     @Inject(ApprovalRoutingService) private readonly approvalRoutingService: ApprovalRoutingService,
     @Inject(OrderBifurcationService) private readonly orderBifurcationService: OrderBifurcationService,
   ) {}
+
+  private async resolveParticipantName(email: string, requestedName?: string) {
+    const [customer] = await this.db
+      .select({ name: customers.name })
+      .from(customers)
+      .where(eq(customers.email, email));
+    return customer?.name || requestedName || 'Authorized Customer';
+  }
 
   // Compatibility validation for callers migrating from token-based service APIs.
   // HTTP portal operations must use getSanitizedQuoteBySession instead.
@@ -86,6 +102,7 @@ export class PortalService {
   }
 
   async submitCounterProposalBySession(session: { quoteId: string; email: string }, dto: CustomerCounterProposalDto) {
+    const participantName = await this.resolveParticipantName(session.email, dto.participantName);
     const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, session.quoteId));
     if (!quote) {
       throw new NotFoundException('Quote not found');
@@ -147,7 +164,7 @@ export class PortalService {
       quoteId: quote.id,
       sessionToken,
       participantEmail: session.email,
-      participantName: dto.participantName,
+      participantName,
       participantRole: 'customer',
       status: 'active',
     });
@@ -158,7 +175,7 @@ export class PortalService {
       await this.approvalRoutingService.submitQuote(quote.id, {
         id: 'external-customer',
         role: 'customer',
-        name: dto.participantName,
+        name: participantName,
       });
     }
 
@@ -170,6 +187,7 @@ export class PortalService {
   }
 
   async confirmQuoteBySession(session: { quoteId: string; email: string }, participantName?: string) {
+    const resolvedParticipantName = await this.resolveParticipantName(session.email, participantName);
     const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, session.quoteId));
     if (!quote) {
       throw new NotFoundException('Quote not found');
@@ -182,7 +200,7 @@ export class PortalService {
       const submission = await this.approvalRoutingService.submitQuote(quote.id, {
         id: 'external-customer',
         role: 'customer',
-        name: participantName || 'Authorized Customer',
+        name: resolvedParticipantName,
       });
       return {
         success: true,
@@ -197,7 +215,7 @@ export class PortalService {
     const bifurcationResult = await this.orderBifurcationService.confirmQuote(quote.id, {
       id: 'customer-portal',
       role: 'customer',
-      name: participantName || 'Authorized Customer',
+      name: resolvedParticipantName,
     });
 
     const [confirmedQuote] = await this.db

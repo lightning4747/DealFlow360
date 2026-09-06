@@ -80,7 +80,7 @@ export type CreateLineCommentDto = z.infer<typeof CreateLineCommentSchema>;
 export const CustomerCounterProposalSchema = z.object({
   counterDiscountPct: z.number().min(0).max(100),
   notes: z.string().max(2000).optional(),
-  participantName: z.string().min(1).max(255),
+  participantName: z.string().min(1).max(255).optional(),
 });
 export type CustomerCounterProposalDto = z.infer<typeof CustomerCounterProposalSchema>;
 

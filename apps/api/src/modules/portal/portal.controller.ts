@@ -29,8 +29,7 @@ export class PortalController {
   @UseGuards(PortalAuthGuard)
   @Post('confirm')
   async confirmQuote(@Req() req: any, @Body() body: any) {
-    const participantName = body?.participantName;
-    const data = await this.portalService.confirmQuoteBySession(req.user, participantName);
+    const data = await this.portalService.confirmQuoteBySession(req.user);
     return { data, meta: null, error: null };
   }
 

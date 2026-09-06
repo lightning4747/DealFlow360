@@ -77,7 +77,7 @@ export default function CustomerPortalDashboardPage() {
         <div className="flex items-center space-x-4">
           <div className="text-right">
             <div className="text-xs font-medium text-white">{user?.name || 'Customer Account'}</div>
-            <div className="text-[10px] text-gray-400 font-mono">{user?.email || 'procurement@acme.com'}</div>
+            <div className="text-[10px] text-gray-400 font-mono">{user?.email || 'Sign in required'}</div>
           </div>
           {user ? (
             <button
@@ -120,9 +120,9 @@ export default function CustomerPortalDashboardPage() {
           <div className="p-4 rounded-lg border border-[#222] bg-[#0c0c0c]">
             <div className="text-[11px] text-gray-400 uppercase tracking-wider">Account Organization</div>
             <div className="text-sm font-semibold text-white mt-1">
-              {user?.name || 'Acme Corporation'}
+              {user?.name || 'Authenticated customer'}
             </div>
-            <div className="text-[11px] text-emerald-400 font-mono mt-0.5">Gold Partner Tier (Up to 25% Benefit)</div>
+            <div className="text-[11px] text-gray-400 font-mono mt-0.5">Account details load from a verified quote session.</div>
           </div>
           <div className="p-4 rounded-lg border border-[#222] bg-[#0c0c0c]">
             <div className="text-[11px] text-gray-400 uppercase tracking-wider">Active Deals / Quotes</div>

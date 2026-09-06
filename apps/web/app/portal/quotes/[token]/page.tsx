@@ -72,7 +72,6 @@ export default function CustomerPortalNegotiationPage() {
         body: JSON.stringify({
           counterDiscountPct: counterDiscount,
           notes: customerComment,
-          participantName: 'Acme Procurement',
         }),
       });
 
@@ -81,7 +80,7 @@ export default function CustomerPortalNegotiationPage() {
         ...prev,
         {
           id: String(Date.now()),
-          participantName: 'Acme Procurement (You)',
+          participantName: 'Customer',
           notes: `${counterDiscount}% counter proposed: ${customerComment || 'Requested revised terms.'}`,
           date: 'Just now',
         },
@@ -102,7 +101,6 @@ export default function CustomerPortalNegotiationPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-portal-token': portalToken },
         body: JSON.stringify({
-          participantName: 'Acme Procurement',
         }),
       });
 
@@ -113,7 +111,7 @@ export default function CustomerPortalNegotiationPage() {
           ...prev,
           {
             id: String(Date.now()),
-            participantName: 'Acme Procurement (You)',
+            participantName: 'Customer',
             notes: json.data?.message || 'Quotation confirmed by customer.',
             date: 'Just now',
           },
