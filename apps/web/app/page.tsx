@@ -18,17 +18,20 @@ export default function DashboardPage() {
     const load = async () => {
       setLoadError(null);
       const headers = getAuthHeaders();
-      const quoteRes = await fetch(`${API_BASE_URL}/sales/quotes?limit=1`, { headers });
+      const quoteRes = await fetch(`${API_BASE_URL}/sales/quotes`, { headers, cache: 'no-store' });
       if (!quoteRes.ok) throw new Error(`Dashboard data unavailable (HTTP ${quoteRes.status})`);
-      setQuoteCount((await quoteRes.json()).meta?.total ?? 0);
-      if (user?.role === 'admin' || user?.role === 'sales_manager' || user?.role === 'finance') {
-        const approvalRes = await fetch(`${API_BASE_URL}/sales/approvals`, {
+      const quoteJson = await quoteRes.json();
+      setQuoteCount(quoteJson.meta?.total ?? (Array.isArray(quoteJson.data) ? quoteJson.data.length : 0));
+      if (user?.role === 'sales_manager' || user?.role === 'finance') {
+        const approvalRes = await fetch(`${API_BASE_URL}/sales/approvals?status=pending`, {
           headers,
           cache: 'no-store',
         });
         if (!approvalRes.ok) throw new Error(`Dashboard data unavailable (HTTP ${approvalRes.status})`);
         const approvals = (await approvalRes.json()).data || [];
         setApprovalCount(approvals.filter((approval: { status?: string }) => approval.status === 'pending').length);
+      } else {
+        setApprovalCount(0);
       }
       const healthRes = await fetch(`${API_BASE_URL}/analytics/deal-health`, { headers });
       if (!healthRes.ok) throw new Error(`Dashboard data unavailable (HTTP ${healthRes.status})`);

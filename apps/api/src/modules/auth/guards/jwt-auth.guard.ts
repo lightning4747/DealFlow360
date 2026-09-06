@@ -1,7 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/auth.decorator';
-import { JwtPayload } from '@dealflow360/types';
 import * as jwt from 'jsonwebtoken';
 
 @Injectable()
@@ -15,6 +14,7 @@ export class JwtAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
+
     if (isPublic) {
       return true;
     }
@@ -39,6 +39,9 @@ export class JwtAuthGuard implements CanActivate {
       const decoded = jwt.verify(token, this.jwtSecret) as any;
       if (decoded.type !== 'access' || typeof decoded.sub !== 'string' || !decoded.role) {
         throw new Error('Invalid access token');
+      }
+      if (decoded.sub && !decoded.id) {
+        decoded.id = decoded.sub;
       }
       request.user = decoded;
       return true;

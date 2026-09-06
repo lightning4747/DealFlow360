@@ -60,6 +60,7 @@ export default function QuotationDetailPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/sales/quotes/${quoteId}`, {
         headers: getAuthHeaders(),
+        cache: 'no-store',
       });
       if (res.ok) {
         const json = await res.json();

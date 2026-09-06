@@ -29,7 +29,7 @@ export class QuotesController {
   @Roles('admin', 'sales_rep', 'sales_manager', 'finance')
   async listQuotes(@Req() req: any) {
     const data = await this.quotesService.findAllQuotes(req.user);
-    return { data, meta: null, error: null };
+    return { data, meta: { total: data.length }, error: null };
   }
 
   @Get('customers')

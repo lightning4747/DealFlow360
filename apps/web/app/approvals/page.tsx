@@ -32,26 +32,28 @@ export default function ApprovalsPage() {
     async function fetchApprovals() {
       try {
         if (authLoading || !accessToken) return;
-        const res = await fetch(`${API_BASE_URL}/sales/approvals`, {
+        if (user?.role === 'admin') {
+          setApprovals([]);
+          return;
+        }
+        const res = await fetch(`${API_BASE_URL}/sales/approvals?status=${filter}`, {
           headers: getAuthHeaders(),
           cache: 'no-store',
         });
         if (!res.ok) throw new Error(`Failed to load approvals (HTTP ${res.status})`);
         const json = await res.json();
         setApprovals(
-          (json.data || [])
-            .filter((item: any) => item.status === 'pending')
-            .map((item: any) => ({
-                id: item.id,
-                quoteId: item.quoteId || item.id,
-                customer: item.customerName || 'Enterprise Customer',
-                blendedRisk: item.blendedRiskScore > 15 ? 'HIGH' : item.blendedRiskScore > 8 ? 'MEDIUM' : 'LOW',
-                stage: item.currentStage || 'Sales Manager',
-                assignedTo: item.assignedRole || 'Carol Manager',
-                status: item.status || 'pending',
-                totalAmount: `$${item.totalAmount || '0'}`,
-                requestedDiscount: `${item.maxDiscountPct || 0}%`,
-            }))
+          (json.data || []).map((item: any) => ({
+            id: item.id,
+            quoteId: item.quoteId || item.id,
+            customer: item.customerName || 'Enterprise Customer',
+            blendedRisk: item.brsScore > 15 ? 'HIGH' : item.brsScore > 8 ? 'MEDIUM' : 'LOW',
+            stage: item.activeStep?.roleRequired || 'Sales Manager',
+            assignedTo: item.assignedRole || item.activeStep?.roleRequired || 'Sales Manager',
+            status: item.status || 'pending',
+            totalAmount: `$${item.totalAmount || '0'}`,
+            requestedDiscount: `${item.brsScore || 0}%`,
+          }))
         );
       } catch (e: any) {
         setApprovals([]);
@@ -59,7 +61,7 @@ export default function ApprovalsPage() {
       }
     }
     fetchApprovals();
-  }, [user, authLoading, accessToken]);
+  }, [user, filter, authLoading, accessToken]);
 
   const handleDecision = async (decision: 'approved' | 'rejected') => {
     if (!selectedApproval) return;
@@ -94,7 +96,22 @@ export default function ApprovalsPage() {
     }
   };
 
-  const filtered = approvals.filter((r) => r.status === filter);
+  if (user?.role === 'admin') {
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <AppHeader />
+        <main className="max-w-6xl mx-auto p-8 space-y-6">
+          <div className="p-6 border border-amber-900 bg-amber-950/30 rounded-lg text-amber-300 text-xs space-y-2">
+            <h2 className="text-sm font-bold">Governance Queue Restricted for Admin Role (FR-03 RBAC)</h2>
+            <p>
+              System Administrators manage master catalog configurations, price lists, discount ceilings, and users.
+              Per FR-03 RBAC rules, administrators do not participate in or decide commercial approval queues. Please switch to a <strong>Sales Manager</strong> or <strong>Finance</strong> account to review pending deal approvals.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -109,13 +126,13 @@ export default function ApprovalsPage() {
           </div>
           {user && (
             <div className="text-right">
-              <span className="text-xs text-gray-400">Current Approver: </span>
+              <span className="text-xs text-gray-400">Authorized Approver: </span>
               <span className="text-xs font-semibold text-white font-mono">{user.name} ({user.role})</span>
             </div>
           )}
         </div>
 
-        {/* Triage Pills from PNG Screen 5 */}
+        {/* Triage Pills */}
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setFilter('pending')}
@@ -125,7 +142,7 @@ export default function ApprovalsPage() {
                 : 'bg-transparent text-gray-400 border-[#333] hover:text-white'
             }`}
           >
-            {approvals.filter((a) => a.status === 'pending').length} Pending
+            Pending
           </button>
           <button
             onClick={() => setFilter('approved')}
@@ -135,7 +152,7 @@ export default function ApprovalsPage() {
                 : 'bg-transparent text-gray-400 border-[#333] hover:text-white'
             }`}
           >
-            {approvals.filter((a) => a.status === 'approved').length} Approved
+            Approved
           </button>
           <button
             onClick={() => setFilter('rejected')}

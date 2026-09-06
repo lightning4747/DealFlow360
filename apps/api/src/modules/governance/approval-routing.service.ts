@@ -29,14 +29,15 @@ export class ApprovalRoutingService {
     private readonly queueService: QueueService,
   ) {}
 
-  async submitQuote(quoteId: string, actor: { id: string; role: string; name: string }) {
+  async submitQuote(quoteId: string, actor: { id?: string; sub?: string; role: string; name: string }) {
+    const actorId = actor.id || actor.sub || '';
     // 1. Fetch Quote
     const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, quoteId));
     if (!quote) {
       throw new NotFoundException(`Quote with ID ${quoteId} not found`);
     }
 
-    if (actor.role === 'sales_rep' && quote.repId !== actor.id) {
+    if (actor.role === 'sales_rep' && quote.repId !== actorId) {
       throw new ForbiddenException('Sales representatives may only submit their own quotes');
     }
 
@@ -294,9 +295,12 @@ export class ApprovalRoutingService {
     };
   }
 
-  async listPendingApprovals(user: { id: string; role: string }) {
-    // Fetch approvals that are pending
-    const pendingApprovals = await this.db
+  async listPendingApprovals(user: { id?: string; sub?: string; role: string }, statusFilter?: string) {
+    const targetStatus = (statusFilter === 'approved' || statusFilter === 'rejected' || statusFilter === 'pending')
+      ? statusFilter
+      : 'pending';
+
+    const approvalRecords = await this.db
       .select({
         id: approvals.id,
         quoteId: approvals.quoteId,
@@ -312,31 +316,27 @@ export class ApprovalRoutingService {
       })
       .from(approvals)
       .innerJoin(quotes, eq(approvals.quoteId, quotes.id))
-      .where(eq(approvals.status, 'pending'))
+      .where(eq(approvals.status, targetStatus as any))
       .orderBy(asc(approvals.createdAt));
 
-    // For each pending approval, get steps
     const results = [];
-    for (const app of pendingApprovals) {
+    for (const app of approvalRecords) {
       const steps = await this.db
         .select()
         .from(approvalSteps)
         .where(eq(approvalSteps.approvalId, app.id))
         .orderBy(asc(approvalSteps.stepOrder));
 
-      const activeStep = steps.find((s: any) => s.stepOrder === app.currentApprovalStep);
+      const activeStep = steps.find((s: any) => s.stepOrder === app.currentApprovalStep) || steps[0];
+      const canAct = user.role !== 'admin' && activeStep?.roleRequired === user.role && app.status === 'pending';
 
-      // Check if user is authorized to act on active step
-      const canAct = activeStep?.roleRequired === user.role;
-
-      if (canAct) {
-        results.push({
-          ...app,
-          activeStep,
-          steps,
-          canAct,
-        });
-      }
+      results.push({
+        ...app,
+        activeStep,
+        assignedRole: activeStep?.roleRequired || 'sales_manager',
+        steps,
+        canAct,
+      });
     }
 
     return results;
@@ -449,7 +449,7 @@ export class ApprovalRoutingService {
           .set({
             decision: 'rejected',
             decisionReason: reason.trim(),
-            assignedUserId: actor.id,
+            assignedUserId: actorId,
             decidedAt: new Date(),
           })
           .where(and(eq(approvalSteps.id, activeStep.id), eq(approvalSteps.decision, 'pending')));
@@ -460,7 +460,7 @@ export class ApprovalRoutingService {
         const [updatedApproval] = await tx
           .update(approvals)
           .set({
-            status: 'draft',
+            status: 'rejected',
             updatedAt: new Date(),
           })
           .where(and(eq(approvals.id, approvalId), eq(approvals.status, 'pending')));
@@ -471,7 +471,7 @@ export class ApprovalRoutingService {
         const [updatedQuote] = await tx
           .update(quotes)
           .set({
-            status: 'rejected',
+            status: 'draft',
             updatedAt: new Date(),
           })
           .where(and(eq(quotes.id, appr.quoteId), eq(quotes.status, 'pending_approval')));

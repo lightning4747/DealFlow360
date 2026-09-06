@@ -31,8 +31,8 @@ export class GovernanceController {
     'internal/approvals',
   ])
   @Roles('sales_manager', 'finance')
-  async listApprovals(@Req() req: any) {
-    const data = await this.approvalService.listPendingApprovals(req.user);
+  async listApprovals(@Req() req: any, @Query('status') status?: string) {
+    const data = await this.approvalService.listPendingApprovals(req.user, status);
     return { data, meta: null, error: null };
   }
 
