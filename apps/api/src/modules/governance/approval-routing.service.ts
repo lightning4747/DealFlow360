@@ -312,10 +312,12 @@ export class ApprovalRoutingService {
         currentApprovalStep: quotes.currentApprovalStep,
         createdAt: approvals.createdAt,
         customerId: quotes.customerId,
+        customerName: customers.name,
         repId: quotes.repId,
       })
       .from(approvals)
       .innerJoin(quotes, eq(approvals.quoteId, quotes.id))
+      .leftJoin(customers, eq(quotes.customerId, customers.id))
       .where(eq(approvals.status, targetStatus as any))
       .orderBy(asc(approvals.createdAt));
 

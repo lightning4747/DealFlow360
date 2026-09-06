@@ -1,6 +1,7 @@
 import { db, sqlClient } from '../client';
-import { users, customerTiers, products, priceLists, priceListItems, customers, discountCeilings, productRecommendations } from '../schema/sales.schema';
+import { users, customerTiers, products, priceLists, priceListItems, customers, discountCeilings, productRecommendations, quotes, approvals, approvalSteps } from '../schema/sales.schema';
 import { warehouses, warehouseStock } from '../schema/fulfillment.schema';
+import { eq, inArray } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 
 async function seed() {
@@ -661,6 +662,120 @@ async function seed() {
       }
     }
     console.log(`✅ Warehouse stock seeded across ${Object.keys(insertedWarehouses).length} hubs for ${hardwareProducts.length} hardware products.`);
+
+    // 9. Seed Quotations & Approval Workflows (Demo FRD Data)
+    console.log('Seeding demo quotations and approval workflows...');
+
+    const rep1User = insertedUsers['rep1@dealflow360.com'];
+    const managerUser = insertedUsers['manager@dealflow360.com'];
+    const financeUser = insertedUsers['finance@dealflow360.com'];
+
+    const acmeCust = await db.select().from(customers).where(eq(customers.email, 'procurement@acme.com')).then(res => res[0]);
+    const globexCust = await db.select().from(customers).where(eq(customers.email, 'purchasing@globex.com')).then(res => res[0]);
+    const initechCust = await db.select().from(customers).where(eq(customers.email, 'billing@initech.com')).then(res => res[0]);
+
+    if (rep1User && acmeCust && globexCust) {
+      // Quote 1: Q-1042 (Acme Corp, High Risk, assigned to Carol Manager)
+      const [quote1042] = await db
+        .insert(quotes)
+        .values({
+          quoteNumber: 'Q-1042',
+          repId: rep1User,
+          customerId: acmeCust.id,
+          status: 'pending_approval',
+          totalAmount: '12400.00',
+          costTotal: '7500.00',
+          grossMarginPct: '39.52',
+          brsScore: '18.50',
+          currentApprovalStep: 1,
+        })
+        .onConflictDoUpdate({
+          target: quotes.quoteNumber,
+          set: {
+            status: 'pending_approval',
+            totalAmount: '12400.00',
+            brsScore: '18.50',
+            currentApprovalStep: 1,
+          },
+        })
+        .returning();
+
+      // Quote 2: Q-1039 (Beta / Globex Corp, Medium Risk, assigned to Dave Finance)
+      const [quote1039] = await db
+        .insert(quotes)
+        .values({
+          quoteNumber: 'Q-1039',
+          repId: rep1User,
+          customerId: globexCust.id,
+          status: 'pending_approval',
+          totalAmount: '29700.00',
+          costTotal: '18000.00',
+          grossMarginPct: '39.39',
+          brsScore: '12.00',
+          currentApprovalStep: 1,
+        })
+        .onConflictDoUpdate({
+          target: quotes.quoteNumber,
+          set: {
+            status: 'pending_approval',
+            totalAmount: '29700.00',
+            brsScore: '12.00',
+            currentApprovalStep: 1,
+          },
+        })
+        .returning();
+
+      // Clear existing approvals for these quotes if re-seeding
+      const existingApprovals = await db.select().from(approvals).where(inArray(approvals.quoteId, [quote1042.id, quote1039.id]));
+      for (const app of existingApprovals) {
+        await db.delete(approvalSteps).where(eq(approvalSteps.approvalId, app.id));
+        await db.delete(approvals).where(eq(approvals.id, app.id));
+      }
+
+      // Create Approval Record for Q-1042 (Sales Manager step)
+      const [app1042] = await db
+        .insert(approvals)
+        .values({
+          quoteId: quote1042.id,
+          brsScore: '18.50',
+          approvalLevel: 'level_2',
+          status: 'pending',
+        })
+        .returning();
+
+      await db.insert(approvalSteps).values([
+        {
+          approvalId: app1042.id,
+          stepOrder: 1,
+          roleRequired: 'sales_manager',
+          assignedUserId: managerUser,
+          decision: 'pending',
+        },
+      ]);
+
+      // Create Approval Record for Q-1039 (Finance step)
+      const [app1039] = await db
+        .insert(approvals)
+        .values({
+          quoteId: quote1039.id,
+          brsScore: '12.00',
+          approvalLevel: 'level_1',
+          status: 'pending',
+        })
+        .returning();
+
+      await db.insert(approvalSteps).values([
+        {
+          approvalId: app1039.id,
+          stepOrder: 1,
+          roleRequired: 'finance',
+          assignedUserId: financeUser,
+          decision: 'pending',
+        },
+      ]);
+
+      console.log('✅ Demo quotes (Q-1042, Q-1039) and approval workflows seeded.');
+    }
 
     console.log('🎉 Database seed completed successfully!');
   } catch (err) {

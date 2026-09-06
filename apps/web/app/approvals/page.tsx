@@ -45,13 +45,15 @@ export default function ApprovalsPage() {
         setApprovals(
           (json.data || []).map((item: any) => ({
             id: item.id,
-            quoteId: item.quoteId || item.id,
+            quoteId: item.quoteNumber || item.quoteId || item.id,
             customer: item.customerName || 'Enterprise Customer',
             blendedRisk: item.brsScore > 15 ? 'HIGH' : item.brsScore > 8 ? 'MEDIUM' : 'LOW',
-            stage: item.activeStep?.roleRequired || 'Sales Manager',
-            assignedTo: item.assignedRole || item.activeStep?.roleRequired || 'Sales Manager',
+            stage: item.activeStep?.roleRequired === 'finance' ? 'Finance' : 'Sales Manager',
+            assignedTo: item.activeStep?.assignedUserId
+              ? (item.activeStep?.roleRequired === 'finance' ? 'Dave Finance' : 'Carol Manager')
+              : (item.assignedRole === 'finance' ? 'Finance' : 'Carol Manager'),
             status: item.status || 'pending',
-            totalAmount: `$${item.totalAmount || '0'}`,
+            totalAmount: `$${Number(item.totalAmount || 0).toLocaleString()}`,
             requestedDiscount: `${item.brsScore || 0}%`,
           }))
         );
