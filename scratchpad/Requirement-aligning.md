@@ -30,6 +30,7 @@ Follow-up completed:
 - Rewrote `apps/web/app/products/page.tsx` as a backend-only catalog view. It now renders only product and price-list records returned by the authenticated APIs, with no placeholder controls, fabricated metrics, fallback rows, or client-created catalog values.
 - Fixed the shared frontend authorization header construction and subscription loading dependency. Protected subscription requests now send a real `Bearer` access token and wait for both auth hydration and an available session token, preventing the page's premature/unauthenticated 401 request.
 - Fixed the billing controller's runtime dependency injection: subscription requests were authenticated but crashed with `billingService` undefined because the controller constructor relied on incomplete reflected metadata. Billing and bifurcation services are now injected explicitly.
+- Removed approval queue placeholder behavior. The approvals page now waits for the authenticated token, surfaces failed list requests, and removes a row only after the backend confirms the decision; rejected/approved quotations no longer remain as fake queue entries.
 
 ### Workstream 2 — Seed deterministic end-to-end scenarios
 

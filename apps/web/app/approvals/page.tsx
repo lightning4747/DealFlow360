@@ -20,7 +20,7 @@ interface ApprovalRow {
 }
 
 export default function ApprovalsPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading, accessToken } = useAuth();
   const [filter, setFilter] = useState<'pending' | 'returned' | 'approved' | 'rejected'>('pending');
   const [approvals, setApprovals] = useState<ApprovalRow[]>([]);
   const [selectedApproval, setSelectedApproval] = useState<ApprovalRow | null>(null);
@@ -28,18 +28,17 @@ export default function ApprovalsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  // Fetch live approvals if user is logged in
   useEffect(() => {
     async function fetchApprovals() {
       try {
+        if (authLoading || !accessToken) return;
         const res = await fetch(`${API_BASE_URL}/sales/approvals`, {
           headers: getAuthHeaders(),
         });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.data && Array.isArray(json.data)) {
-            setApprovals(
-              json.data.map((item: any) => ({
+        if (!res.ok) throw new Error(`Failed to load approvals (HTTP ${res.status})`);
+        const json = await res.json();
+        setApprovals(
+          (json.data || []).map((item: any) => ({
                 id: item.id,
                 quoteId: item.quoteId || item.id,
                 customer: item.customerName || 'Enterprise Customer',
@@ -49,17 +48,15 @@ export default function ApprovalsPage() {
                 status: item.status || 'pending',
                 totalAmount: `$${item.totalAmount || '0'}`,
                 requestedDiscount: `${item.maxDiscountPct || 0}%`,
-              }))
-            );
-          }
-        }
-      } catch (e) {
+          }))
+        );
+      } catch (e: any) {
         setApprovals([]);
-        setActionMessage('Unable to load approvals from the backend.');
+        setActionMessage(e.message || 'Unable to load approvals from the backend.');
       }
     }
     fetchApprovals();
-  }, [user]);
+  }, [user, authLoading, accessToken]);
 
   const handleDecision = async (decision: 'approved' | 'rejected') => {
     if (!selectedApproval) return;
@@ -80,10 +77,7 @@ export default function ApprovalsPage() {
         throw new Error(error?.message || `Approval request failed (HTTP ${res.status})`);
       }
 
-      // Refresh from the server so the UI reflects the persisted decision.
-      setApprovals((prev) =>
-        prev.map((a) => (a.id === selectedApproval.id ? { ...a, status: decision } : a))
-      );
+      setApprovals((prev) => prev.filter((a) => a.id !== selectedApproval.id));
       setActionMessage(`Quotation ${selectedApproval.quoteId} has been successfully ${decision}.`);
       setTimeout(() => {
         setSelectedApproval(null);
