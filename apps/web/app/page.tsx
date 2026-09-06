@@ -11,28 +11,26 @@ export default function DashboardPage() {
   const [quoteCount, setQuoteCount] = useState<number | null>(null);
   const [approvalCount, setApprovalCount] = useState<number | null>(null);
   const [healthCount, setHealthCount] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
     const load = async () => {
+      setLoadError(null);
       const headers = getAuthHeaders();
       const quoteRes = await fetch(`${API_BASE_URL}/sales/quotes?limit=1`, { headers });
-      if (quoteRes.ok) setQuoteCount((await quoteRes.json()).meta?.total ?? 0);
+      if (!quoteRes.ok) throw new Error(`Dashboard data unavailable (HTTP ${quoteRes.status})`);
+      setQuoteCount((await quoteRes.json()).meta?.total ?? 0);
       if (user?.role === 'admin' || user?.role === 'sales_manager' || user?.role === 'finance') {
         const approvalRes = await fetch(`${API_BASE_URL}/sales/approvals`, { headers });
         if (approvalRes.ok) setApprovalCount(((await approvalRes.json()).data || []).length);
       }
       const healthRes = await fetch(`${API_BASE_URL}/analytics/deal-health`, { headers });
-      if (healthRes.ok) {
-        const data = await healthRes.json();
-        setHealthCount(Array.isArray(data?.data?.alerts) ? data.data.alerts.length : Array.isArray(data?.alerts) ? data.alerts.length : 0);
-      }
+      if (!healthRes.ok) throw new Error(`Dashboard data unavailable (HTTP ${healthRes.status})`);
+      const data = await healthRes.json();
+      setHealthCount(Array.isArray(data?.data?.alerts) ? data.data.alerts.length : Array.isArray(data?.alerts) ? data.alerts.length : 0);
     };
-    load().catch(() => {
-      setQuoteCount(0);
-      setApprovalCount(0);
-      setHealthCount(0);
-    });
+    load().catch((error: Error) => setLoadError(error.message));
   }, [authLoading, user]);
   return (
     <div className="min-h-screen bg-black text-white">
@@ -42,6 +40,7 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold tracking-tight text-white">Sales Dashboard / Home</h1>
           <p className="text-xs text-gray-400 mt-1">Central hub, links out to every module below</p>
         </div>
+        {loadError && <div className="p-4 border border-rose-900 bg-rose-950/30 rounded text-xs text-rose-300">{loadError}</div>}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link href="/approvals" className="p-5 rounded-lg border border-[#222] bg-[#111] hover:border-gray-600 transition block">
