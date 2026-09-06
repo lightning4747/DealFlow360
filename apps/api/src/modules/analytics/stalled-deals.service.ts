@@ -37,12 +37,13 @@ export class StalledDealsService {
         FROM sales.quotes q
         LEFT JOIN sales.customers a ON q.customer_id = a.id
         WHERE q.status NOT IN ('fulfilled', 'cancelled')
-          AND COALESCE(q.updated_at, q.created_at) < NOW() - ${daysInterval}::interval
+          AND COALESCE(q.updated_at, q.created_at) < NOW() - ((${Math.max(1, Math.floor(thresholdDays))} || ' days')::interval)
         ORDER BY inactive_days DESC, total_amount DESC
         LIMIT 100;
       `);
 
-      return (result.rows || []).map((row: any) => {
+      const rows = (result as any).rows || (Array.isArray(result) ? result : []);
+      return rows.map((row: any) => {
         const inactiveDays = Number(row.inactive_days || 0);
         let suggestedAction = 'Follow up with sales rep';
         if (row.status === 'PENDING_APPROVAL') {

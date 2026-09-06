@@ -131,7 +131,8 @@ export class AnomalyDetectionService {
         LIMIT 50;
       `);
 
-      return (result.rows || []).map((row: any) => {
+      const rows = (result as any).rows || (Array.isArray(result) ? result : []);
+      return rows.map((row: any) => {
         const zScore = Number(Number(row.z_score).toFixed(2));
         const severity: DealHealthAnomalySeverity = zScore >= 3.0 ? 'CRITICAL' : 'WARNING';
         return {

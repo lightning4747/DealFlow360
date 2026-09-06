@@ -201,26 +201,88 @@ async function runSeed() {
           `;
         }
       }
+
+      // 4. Seed Subscriptions for recurring quotes / software catalog items (25+ records)
+      if (i % 3 === 0 || status === 'confirmed' || status === 'fulfilled') {
+        const planNames = ['Enterprise Annual SaaS', 'Pro Team Tier', 'Developer API Scale Plan', 'Cloud Infrastructure Bundle', '24/7 Dedicated SLA'];
+        const intervals = ['monthly', 'yearly', 'quarterly'];
+        const subStatus = i % 10 === 0 ? 'cancelled' : i % 7 === 0 ? 'paused' : 'active';
+        const planName = planNames[i % planNames.length];
+        const interval = intervals[i % intervals.length];
+        const seats = 5 + (i % 50);
+        const unitPrice = (120 + (i % 15) * 10).toFixed(2);
+        const monthlyAmt = (seats * parseFloat(unitPrice) * (interval === 'yearly' ? 0.85 : 1)).toFixed(2);
+
+        await sqlClient`
+          INSERT INTO billing.subscriptions (
+            customer_id, quote_id, plan_name, status, quantity, unit_price, discount_pct, monthly_amount, amount, mrr, currency, billing_interval, current_period_start, current_period_end, auto_renew
+          ) VALUES (
+            ${custId}, ${q.id}, ${planName}, ${subStatus}, ${seats}, ${unitPrice}, ${(i % 12).toFixed(2)}, ${monthlyAmt}, ${(parseFloat(monthlyAmt) * 12).toFixed(2)}, ${monthlyAmt}, 'USD', ${interval}, NOW() - INTERVAL '15 days', NOW() + INTERVAL '350 days', true
+          );
+        `;
+      }
+
+      // 5. Seed Stalled Deal Timestamps for non-terminal quotes (15+ stalled quotes idle 8-30 days)
+      if ((i % 4 === 0) && status.toLowerCase() !== 'fulfilled' && status.toLowerCase() !== 'cancelled') {
+        const idleDays = 8 + (i % 22);
+        await sqlClient`
+          UPDATE sales.quotes
+          SET updated_at = NOW() - (${idleDays} || ' days')::interval,
+              created_at = NOW() - (${idleDays + 5} || ' days')::interval
+          WHERE id = ${q.id};
+        `;
+      }
+
+      // 6. Seed Rep Discount Analytics Tracking for Statistical Anomaly Observability
+      const category = catalogProducts.length > 0 ? catalogProducts[i % catalogProducts.length].category : 'software';
+      // Base historical discount (around 5-10%)
+      const baseDiscount = 5 + (i % 6);
+      await sqlClient`
+        INSERT INTO analytics.rep_discount_tracking (rep_id, quote_id, category, applied_discount_pct, tier_ceiling_pct, time)
+        VALUES (${assignedRep.id}, ${q.id}, ${category}, ${baseDiscount}, 20.00, NOW() - INTERVAL '15 days');
+      `;
+      await sqlClient`
+        INSERT INTO analytics.rep_discount_tracking (rep_id, quote_id, category, applied_discount_pct, tier_ceiling_pct, time)
+        VALUES (${assignedRep.id}, ${q.id}, ${category}, ${baseDiscount + 1}, 20.00, NOW() - INTERVAL '10 days');
+      `;
+      await sqlClient`
+        INSERT INTO analytics.rep_discount_tracking (rep_id, quote_id, category, applied_discount_pct, tier_ceiling_pct, time)
+        VALUES (${assignedRep.id}, ${q.id}, ${category}, ${baseDiscount - 1}, 20.00, NOW() - INTERVAL '5 days');
+      `;
+
+      // Trigger high z-score anomalies for select reps (e.g., rep2, rep4) with a 35% discount entry in last 7 days
+      if (i % 12 === 0) {
+        await sqlClient`
+          INSERT INTO analytics.rep_discount_tracking (rep_id, quote_id, category, applied_discount_pct, tier_ceiling_pct, time)
+          VALUES (${assignedRep.id}, ${q.id}, ${category}, 38.50, 20.00, NOW() - INTERVAL '2 days');
+        `;
+      }
     }
 
-    // Seed stock inventory across all 12 spatial warehouses
-    console.log('📦 Seeding warehouse inventory stock across all 12 spatial hubs...');
-    for (const whCode of Object.keys(insertedWarehouses)) {
+    // Seed varied stock inventory across all 12 spatial warehouses
+    console.log('📦 Seeding varied warehouse stock & variants across all 12 spatial hubs...');
+    for (let whIdx = 0; whIdx < Object.keys(insertedWarehouses).length; whIdx++) {
+      const whCode = Object.keys(insertedWarehouses)[whIdx];
       const whId = insertedWarehouses[whCode];
-      for (const prod of catalogProducts) {
+      for (let pIdx = 0; pIdx < catalogProducts.length; pIdx++) {
+        const prod = catalogProducts[pIdx];
+        // Create 20-30 distinct available/reserved stock combinations per warehouse/product
+        const availableQty = 15 + ((whIdx * 17 + pIdx * 23) % 235);
+        const reservedQty = (whIdx + pIdx) % 7 === 0 ? 0 : 5 + ((whIdx * 3 + pIdx * 7) % 40);
+
         await sqlClient`
           INSERT INTO fulfillment.warehouse_stock (warehouse_id, product_id, available_qty, reserved_qty)
-          VALUES (${whId}, ${prod.id}, 150, 10)
+          VALUES (${whId}, ${prod.id}, ${availableQty}, ${reservedQty})
           ON CONFLICT (warehouse_id, product_id)
-          DO UPDATE SET available_qty = 150;
+          DO UPDATE SET available_qty = ${availableQty}, reserved_qty = ${reservedQty};
         `;
       }
     }
 
     console.log('🎉 Production-Grade Seeding Completed Successfully!');
     console.log(`✅ Seeded ${Object.keys(insertedUsers).length} Users.`);
-    console.log(`✅ Seeded ${Object.keys(insertedWarehouses).length} Spatial Warehouses.`);
-    console.log(`✅ Seeded 105 Quotations & Approval Workflows.`);
+    console.log(`✅ Seeded ${Object.keys(insertedWarehouses).length} Spatial Warehouses with Varied Stock.`);
+    console.log(`✅ Seeded 105 Quotations, 30+ Subscriptions, and Deal Health Anomaly Analytics.`);
     process.exit(0);
   } catch (err) {
     console.error('❌ Seeding failed with error:', err);
