@@ -323,15 +323,16 @@ export class ApprovalRoutingService {
       const activeStep = steps.find((s: any) => s.stepOrder === app.currentApprovalStep);
 
       // Check if user is authorized to act on active step
-      const canAct =
-        user.role === 'admin' || (activeStep && activeStep.roleRequired === user.role);
+      const canAct = activeStep?.roleRequired === user.role;
 
-      results.push({
-        ...app,
-        activeStep,
-        steps,
-        canAct,
-      });
+      if (canAct) {
+        results.push({
+          ...app,
+          activeStep,
+          steps,
+          canAct,
+        });
+      }
     }
 
     return results;
@@ -425,7 +426,7 @@ export class ApprovalRoutingService {
     }
 
     // Role check
-    if (actor.role !== 'admin' && actor.role !== activeStep.roleRequired) {
+    if (actor.role !== activeStep.roleRequired) {
       throw new ForbiddenException(
         `Your role '${actor.role}' is not authorized to decide step ${activeStep.stepOrder} (required: '${activeStep.roleRequired}')`,
       );

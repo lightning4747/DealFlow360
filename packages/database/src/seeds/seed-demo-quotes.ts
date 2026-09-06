@@ -35,7 +35,7 @@ async function seedDemoQuotes() {
     })
     .onConflictDoUpdate({
       target: quotes.quoteNumber,
-      set: { status: 'draft', totalAmount: '4050.00' },
+      set: { totalAmount: '4050.00' },
     })
     .returning();
 
@@ -136,7 +136,7 @@ async function seedDemoQuotes() {
     })
     .onConflictDoUpdate({
       target: quotes.quoteNumber,
-      set: { status: 'draft', totalAmount: '12000.00' },
+      set: { totalAmount: '12000.00' },
     })
     .returning();
 

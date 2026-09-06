@@ -19,7 +19,7 @@ export class GovernanceController {
     'sales/quotes/:id/submit',
     'internal/quotes/:id/submit',
   ])
-  @Roles('admin', 'sales_rep', 'sales_manager')
+  @Roles('sales_rep')
   async submitQuote(@Param('id') quoteId: string, @Req() req: any) {
     return this.approvalService.submitQuote(quoteId, req.user);
   }
@@ -30,7 +30,7 @@ export class GovernanceController {
     'sales/approvals',
     'internal/approvals',
   ])
-  @Roles('sales_manager', 'finance', 'admin')
+  @Roles('sales_manager', 'finance')
   async listApprovals(@Req() req: any) {
     const data = await this.approvalService.listPendingApprovals(req.user);
     return { data, meta: null, error: null };
@@ -42,7 +42,7 @@ export class GovernanceController {
     'sales/approvals/:id',
     'internal/approvals/:id',
   ])
-  @Roles('sales_manager', 'finance', 'admin')
+  @Roles('sales_manager', 'finance')
   async getApprovalDetails(@Param('id') approvalId: string) {
     const data = await this.approvalService.getApprovalDetails(approvalId);
     return { data, meta: null, error: null };
@@ -55,7 +55,7 @@ export class GovernanceController {
     'internal/approvals/:id/approve',
     'sales/quotes/:id/approve',
   ])
-  @Roles('sales_manager', 'finance', 'admin')
+  @Roles('sales_manager', 'finance')
   async approveQuote(
     @Param('id') approvalId: string,
     @Body() body: { comment?: string },
@@ -71,7 +71,7 @@ export class GovernanceController {
     'internal/approvals/:id/reject',
     'sales/quotes/:id/reject',
   ])
-  @Roles('sales_manager', 'finance', 'admin')
+  @Roles('sales_manager', 'finance')
   async rejectQuote(
     @Param('id') approvalId: string,
     @Body() body: { reason: string },
@@ -85,7 +85,7 @@ export class GovernanceController {
     'audit/:entityType/:entityId',
     'sales/audit/:entityType/:entityId',
   ])
-  @Roles('sales_manager', 'finance', 'admin')
+  @Roles('sales_manager', 'finance')
   async getAuditLogs(
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
