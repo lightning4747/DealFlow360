@@ -43,7 +43,16 @@ export class PaymentsController {
       throw new BadRequestException('Authenticated tenant context is required');
     }
 
-    const parsed = ProcessPaymentRequestSchema.safeParse({ ...rawBody, tenantId });
+    if (typeof rawBody?.invoiceId !== 'string') {
+      throw new BadRequestException('Invoice ID is required');
+    }
+    const invoice = await this.billingService.getInvoiceById(rawBody.invoiceId, request.user as any);
+    const parsed = ProcessPaymentRequestSchema.safeParse({
+      ...rawBody,
+      tenantId,
+      amount: Number(invoice.totalAmount),
+      currency: invoice.currency,
+    });
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.errors);
     }
