@@ -57,6 +57,7 @@ export default function InvoicesPage() {
   const [voidReason, setVoidReason] = useState('');
   const [voidActionLoading, setVoidActionLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading) fetchInvoices();
@@ -126,14 +127,27 @@ export default function InvoicesPage() {
     if (!selectedInvoice) return;
     try {
       setPdfLoading(true);
+      setPdfError(null);
       const res = await fetch(`${API_BASE_URL}/internal/invoices/${selectedInvoice.id}/pdf`, {
-        headers: getAuthHeaders(),
+        credentials: 'include',
+        headers: { ...getAuthHeaders(), Accept: 'application/pdf' },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to download invoice PDF`);
-      if (!res.headers.get('content-type')?.includes('application/pdf')) {
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}: Failed to download invoice PDF`;
+        try {
+          const errorBody = await res.json();
+          detail = errorBody.error?.message || errorBody.message || detail;
+        } catch {
+          // Preserve the HTTP error when the server returns a non-JSON error body.
+        }
+        throw new Error(detail);
+      }
+      if (!contentType.toLowerCase().includes('application/pdf')) {
         throw new Error('Invoice service returned an invalid document response');
       }
       const blob = await res.blob();
+      if (blob.size === 0) throw new Error('Invoice service returned an empty PDF');
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -144,7 +158,7 @@ export default function InvoicesPage() {
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err: any) {
-      setError(err.message);
+      setPdfError(err instanceof Error ? err.message : 'Failed to download invoice PDF');
     } finally {
       setPdfLoading(false);
     }
@@ -366,6 +380,7 @@ export default function InvoicesPage() {
                   >
                     {pdfLoading ? 'Preparing PDF...' : 'Download PDF'}
                   </button>
+                  {pdfError && <span className="self-center text-xs text-rose-400">{pdfError}</span>}
                 </div>
                 {selectedInvoice.status !== 'paid' && selectedInvoice.status !== 'voided' && (
                   <button
