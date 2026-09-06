@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   Req,
+  Inject,
 } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { OrderBifurcationService } from './order-bifurcation.service';
@@ -26,7 +27,9 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BillingController {
   constructor(
+    @Inject(BillingService)
     private readonly billingService: BillingService,
+    @Inject(OrderBifurcationService)
     private readonly bifurcationService: OrderBifurcationService,
   ) {}
 

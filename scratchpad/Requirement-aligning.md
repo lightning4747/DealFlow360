@@ -29,6 +29,7 @@ Follow-up completed:
 - Fulfillment, dashboard, and product pages now show loading/error/empty states when backend data is unavailable rather than substituting mock records.
 - Rewrote `apps/web/app/products/page.tsx` as a backend-only catalog view. It now renders only product and price-list records returned by the authenticated APIs, with no placeholder controls, fabricated metrics, fallback rows, or client-created catalog values.
 - Fixed the shared frontend authorization header construction and subscription loading dependency. Protected subscription requests now send a real `Bearer` access token and wait for both auth hydration and an available session token, preventing the page's premature/unauthenticated 401 request.
+- Fixed the billing controller's runtime dependency injection: subscription requests were authenticated but crashed with `billingService` undefined because the controller constructor relied on incomplete reflected metadata. Billing and bifurcation services are now injected explicitly.
 
 ### Workstream 2 — Seed deterministic end-to-end scenarios
 
