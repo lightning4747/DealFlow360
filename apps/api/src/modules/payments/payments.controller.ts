@@ -42,6 +42,7 @@ export class PaymentsController {
     if (!tenantId) {
       throw new BadRequestException('Authenticated tenant context is required');
     }
+
     const parsed = ProcessPaymentRequestSchema.safeParse({ ...rawBody, tenantId });
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.errors);
@@ -80,12 +81,34 @@ export class PaymentsController {
     };
   }
 
+  @Post('orders')
+  async createOrder(@Body() body: { invoiceId: string }, @Req() request: any) {
+    if (!this.paymentGateway.createOrder) {
+      throw new BadRequestException('Payment gateway does not support order creation');
+    }
+    const invoice = await this.billingService.getInvoiceById(body.invoiceId, request.user);
+    const amount = Number(invoice.totalAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Invoice has no payable amount');
+    }
+    return this.paymentGateway.createOrder({
+      invoiceId: invoice.id,
+      amount,
+      currency: invoice.currency,
+    });
+  }
+
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   @UseGuards(WebhookSignatureGuard)
   @Public()
-  async handleWebhook(@Body() rawBody: any) {
-    const parsed = WebhookEventPayloadSchema.safeParse(rawBody);
+  async handleWebhook(@Body() rawBody: any, @Req() request: any) {
+    const signature = request.headers['x-razorpay-signature'] || request.headers['x-signature'];
+    const payload = request.rawBody || JSON.stringify(rawBody);
+    const gatewayEvent = this.paymentGateway.parseWebhook
+      ? await this.paymentGateway.parseWebhook(payload, signature)
+      : rawBody;
+    const parsed = WebhookEventPayloadSchema.safeParse(gatewayEvent);
     if (!parsed.success) {
       throw new BadRequestException('Malformed webhook payload');
     }

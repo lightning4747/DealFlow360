@@ -8,6 +8,8 @@ async function bootstrap() {
   const logger = new DealFlow360Logger();
   const app = await NestFactory.create(AppModule, {
     logger,
+    bodyParser: true,
+    rawBody: true,
   });
 
   app.enableCors({

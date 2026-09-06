@@ -13,6 +13,7 @@ import { SpatialAllocationEngine } from '../fulfillment/spatial-allocation.engin
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
 import { KafkaService } from '../events/kafka/kafka.service';
 import { getCorrelationId, getTenantId, runWithContext } from '../../common/logging/request-context';
+import { MailService } from './mail.service';
 
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
@@ -36,6 +37,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     private readonly spatialEngine: SpatialAllocationEngine,
     private readonly fulfillmentService: FulfillmentService,
     private readonly kafkaService: KafkaService,
+    private readonly mailService: MailService,
   ) {
     const host = this.configService?.get<string>('REDIS_HOST') || process.env.REDIS_HOST || 'localhost';
     const port = parseInt(this.configService?.get<string>('REDIS_PORT') || process.env.REDIS_PORT || '6379', 10);
@@ -130,7 +132,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       async (job: Job<EmailNotificationJobPayload>) => {
         return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
           this.logger.log(`Sending email [${job.data.templateId}] to ${job.data.to} (key: ${job.data.idempotencyKey})`);
-          throw new Error('Email provider is not configured; notification was not sent');
+          return this.mailService.send(job.data);
         });
       },
       {

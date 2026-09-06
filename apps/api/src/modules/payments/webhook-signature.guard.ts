@@ -10,13 +10,13 @@ export class WebhookSignatureGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
-    const signature = request.headers['x-signature'] || request.headers['stripe-signature'];
+    const signature = request.headers['x-razorpay-signature'] || request.headers['x-signature'] || request.headers['stripe-signature'];
 
     if (!signature) {
       throw new UnauthorizedException('Missing webhook signature header');
     }
 
-    const payload = typeof request.body === 'string' ? request.body : JSON.stringify(request.body);
+    const payload = request.rawBody || (typeof request.body === 'string' ? request.body : JSON.stringify(request.body));
     const isValid = this.paymentGateway.verifyWebhookSignature(payload, signature as string, process.env.PAYMENT_WEBHOOK_SECRET || 'whsec_test_mock_secret_key_360');
 
     if (!isValid) {
