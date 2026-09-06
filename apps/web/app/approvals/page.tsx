@@ -183,14 +183,14 @@ export default function ApprovalsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1e1e1e]">
-              {filtered.length === 0 ? (
+              {approvals.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-gray-500">
                     No quotations in {filter} queue.
                   </td>
                 </tr>
               ) : (
-                filtered.map((row) => (
+                approvals.map((row) => (
                   <tr
                     key={row.id}
                     onClick={() => setSelectedApproval(row)}

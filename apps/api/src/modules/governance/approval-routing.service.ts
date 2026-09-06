@@ -401,6 +401,7 @@ export class ApprovalRoutingService {
     reason: string | undefined,
     actor: { id: string; role: string; name: string },
   ) {
+    const actorId = (actor as any).id || (actor as any).sub;
     const [appr] = await this.db.select().from(approvals).where(eq(approvals.id, approvalId));
     if (!appr) {
       throw new NotFoundException(`Approval with ID ${approvalId} not found`);
