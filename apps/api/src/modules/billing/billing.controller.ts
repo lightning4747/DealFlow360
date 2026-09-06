@@ -67,12 +67,12 @@ export class BillingController {
 
   @Get('internal/invoices/:id/pdf')
   @Roles('admin', 'finance', 'sales_manager', 'sales_rep')
-  async downloadInvoicePdf(@Param('id') id: string, @Res({ passthrough: true }) response: any) {
+  async downloadInvoicePdf(@Param('id') id: string, @Res() response: any): Promise<void> {
     const document = await this.billingService.generateInvoicePdf(id);
     response.setHeader('Content-Type', 'application/pdf');
     response.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
     response.setHeader('Content-Length', document.content.length);
-    return document.content;
+    response.send(document.content);
   }
 
   @Get('internal/invoices/:id')

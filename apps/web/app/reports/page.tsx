@@ -39,6 +39,28 @@ export default function ReportsPage() {
   const totalApprovals = velocity.reduce((acc, v) => acc + v.quoteApprovals, 0);
   const totalConversions = velocity.reduce((acc, v) => acc + v.quoteConversions, 0);
 
+  const exportCsv = () => {
+    const header = ['timeBucket', 'quoteCreations', 'quoteApprovals', 'quoteConversions', 'averageCycleHours'];
+    const rows = velocity.map((metric) => [
+      metric.timeBucket,
+      metric.quoteCreations,
+      metric.quoteApprovals,
+      metric.quoteConversions,
+      metric.averageCycleHours,
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\r\n');
+    const url = URL.createObjectURL(new Blob([`${csv}\r\n`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dealflow-velocity-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       <AppHeader />
@@ -56,7 +78,7 @@ export default function ReportsPage() {
               Export PDF
             </button>
             <button 
-              onClick={() => alert('Exporting dataset snapshot...')}
+              onClick={exportCsv}
               className="px-3 py-1.5 rounded text-xs font-medium border border-[#333] text-gray-300 hover:bg-[#1a1a1a] transition"
             >
               Export CSV
@@ -69,21 +91,21 @@ export default function ReportsPage() {
           <div className="p-4 rounded-lg border border-[#222] bg-[#0f0f0f]">
             <div className="text-xs text-gray-400">Quotes Created (24h)</div>
             <div className="text-2xl font-bold font-mono text-white mt-1">
-              {loading ? '...' : totalCreations || '148'}
+              {loading ? '...' : totalCreations}
             </div>
             <div className="text-[11px] text-emerald-400 mt-1">Live aggregated velocity</div>
           </div>
           <div className="p-4 rounded-lg border border-[#222] bg-[#0f0f0f]">
             <div className="text-xs text-gray-400">Quotes Approved (24h)</div>
             <div className="text-2xl font-bold font-mono text-white mt-1">
-              {loading ? '...' : totalApprovals || '42'}
+              {loading ? '...' : totalApprovals}
             </div>
             <div className="text-[11px] text-gray-500 mt-1">Avg cycle: 4.2 hrs</div>
           </div>
           <div className="p-4 rounded-lg border border-[#222] bg-[#0f0f0f]">
             <div className="text-xs text-gray-400">Quotes Converted (24h)</div>
             <div className="text-2xl font-bold font-mono text-white mt-1">
-              {loading ? '...' : totalConversions || '29'}
+              {loading ? '...' : totalConversions}
             </div>
             <div className="text-[11px] text-emerald-400 mt-1">Direct to Order &amp; Billing</div>
           </div>
