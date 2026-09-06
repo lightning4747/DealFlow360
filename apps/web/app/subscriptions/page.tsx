@@ -41,7 +41,7 @@ interface SubscriptionDetail extends SubscriptionItem {
 }
 
 export default function SubscriptionsPage() {
-  const { isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading, accessToken } = useAuth();
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +63,8 @@ export default function SubscriptionsPage() {
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!authLoading) fetchSubscriptions();
-  }, [filterStatus, authLoading]);
+    if (!authLoading && accessToken) fetchSubscriptions();
+  }, [filterStatus, authLoading, accessToken]);
 
   const fetchSubscriptions = async () => {
     try {
