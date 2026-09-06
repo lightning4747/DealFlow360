@@ -111,6 +111,7 @@ export class BillingController {
   @Get('internal/subscriptions')
   @Roles('admin', 'finance', 'sales_manager', 'sales_rep')
   async listSubscriptions(
+    @Req() req: any,
     @Query('customer_id') customerId?: string,
     @Query('status') status?: string,
     @Query('page') page?: number,
@@ -121,29 +122,30 @@ export class BillingController {
       status,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
+      actor: req.user,
     });
     return result;
   }
 
   @Get('internal/subscriptions/:id')
   @Roles('admin', 'finance', 'sales_manager', 'sales_rep')
-  async getSubscription(@Param('id') id: string) {
-    const data = await this.billingService.getSubscriptionById(id);
+  async getSubscription(@Param('id') id: string, @Req() req: any) {
+    const data = await this.billingService.getSubscriptionById(id, req.user);
     return { data, meta: null, error: null };
   }
 
   @Get('internal/subscriptions/:id/billing-schedule')
   @Roles('admin', 'finance', 'sales_manager', 'sales_rep')
-  async getSubscriptionBillingSchedule(@Param('id') id: string) {
-    const data = await this.billingService.getSubscriptionBillingSchedules(id);
+  async getSubscriptionBillingSchedule(@Param('id') id: string, @Req() req: any) {
+    const data = await this.billingService.getSubscriptionBillingSchedules(id, req.user);
     return { data, meta: null, error: null };
   }
 
   @Get('internal/subscriptions/:id/proration-preview')
   @Roles('admin', 'finance', 'sales_manager', 'sales_rep')
-  async previewProration(@Param('id') id: string, @Query() query: any) {
+  async previewProration(@Param('id') id: string, @Query() query: any, @Req() req: any) {
     const dto = ProrationPreviewQuerySchema.parse(query);
-    const data = await this.billingService.previewProration(id, dto);
+    const data = await this.billingService.previewProration(id, dto, req.user);
     return { data, meta: null, error: null };
   }
 

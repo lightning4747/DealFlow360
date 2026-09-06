@@ -43,6 +43,13 @@ export class BillingService {
     private readonly queueService: QueueService,
   ) {}
 
+  private async assertSubscriptionAccess(subscription: { quoteId?: string | null }, actor?: { id?: string; role?: string }, db = this.db) {
+    if (actor?.role !== 'sales_rep') return;
+    if (!subscription.quoteId) throw new NotFoundException('Subscription not found');
+    const [quote] = await db.select({ repId: quotes.repId }).from(quotes).where(eq(quotes.id, subscription.quoteId));
+    if (!quote || quote.repId !== actor.id) throw new NotFoundException('Subscription not found');
+  }
+
   private async generateCreditNoteNumber(tx: any): Promise<string> {
     const year = new Date().getUTCFullYear();
     try {
@@ -329,7 +336,7 @@ export class BillingService {
 
   // ─── SUBSCRIPTIONS ────────────────────────────────────────────────────────
 
-  async listSubscriptions(params: { customerId?: string; status?: string; page?: number; limit?: number }) {
+  async listSubscriptions(params: { customerId?: string; status?: string; page?: number; limit?: number; actor?: { id: string; role: string } }) {
     const page = params.page && params.page > 0 ? params.page : 1;
     const limit = params.limit && params.limit > 0 ? params.limit : 20;
     const offset = (page - 1) * limit;
@@ -340,6 +347,9 @@ export class BillingService {
     }
     if (params.status) {
       conditions.push(eq(subscriptions.status, params.status));
+    }
+    if (params.actor?.role === 'sales_rep') {
+      conditions.push(eq(quotes.repId, params.actor.id));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -369,6 +379,7 @@ export class BillingService {
       .from(subscriptions)
       .leftJoin(customers, eq(subscriptions.customerId, customers.id))
       .leftJoin(products, eq(subscriptions.productId, products.id))
+      .leftJoin(quotes, eq(subscriptions.quoteId, quotes.id))
       .where(whereClause)
       .orderBy(desc(subscriptions.createdAt))
       .limit(limit)
@@ -377,6 +388,7 @@ export class BillingService {
     const [countResult] = await this.db
       .select({ count: sql`count(*)` })
       .from(subscriptions)
+      .leftJoin(quotes, eq(subscriptions.quoteId, quotes.id))
       .where(whereClause);
 
     const total = Number(countResult?.count || 0);
@@ -393,7 +405,7 @@ export class BillingService {
     };
   }
 
-  async getSubscriptionById(id: string) {
+  async getSubscriptionById(id: string, actor?: { id: string; role: string }) {
     const [sub] = await this.db
       .select({
         id: subscriptions.id,
@@ -428,8 +440,9 @@ export class BillingService {
     if (!sub) {
       throw new NotFoundException(`Subscription with ID ${id} not found`);
     }
+    await this.assertSubscriptionAccess(sub, actor);
 
-    const schedules = await this.getSubscriptionBillingSchedules(id);
+    const schedules = await this.getSubscriptionBillingSchedules(id, actor);
 
     return {
       ...sub,
@@ -437,7 +450,13 @@ export class BillingService {
     };
   }
 
-  async getSubscriptionBillingSchedules(subscriptionId: string) {
+  async getSubscriptionBillingSchedules(subscriptionId: string, actor?: { id: string; role: string }) {
+    if (actor?.role === 'sales_rep') {
+      const [sub] = await this.db.select({ quoteId: subscriptions.quoteId }).from(subscriptions).where(eq(subscriptions.id, subscriptionId));
+      if (!sub?.quoteId) throw new NotFoundException(`Subscription with ID ${subscriptionId} not found`);
+      const [quote] = await this.db.select({ repId: quotes.repId }).from(quotes).where(eq(quotes.id, sub.quoteId));
+      if (!quote || quote.repId !== actor.id) throw new NotFoundException(`Subscription with ID ${subscriptionId} not found`);
+    }
     return this.db
       .select()
       .from(billingSchedules)
@@ -448,11 +467,12 @@ export class BillingService {
   /**
    * Dry-run preview of proration calculations for hypothetical seat adjustment.
    */
-  async previewProration(subscriptionId: string, query: ProrationPreviewQueryDto) {
+  async previewProration(subscriptionId: string, query: ProrationPreviewQueryDto, actor?: { id?: string; role?: string }) {
     const [sub] = await this.db.select().from(subscriptions).where(eq(subscriptions.id, subscriptionId));
     if (!sub) {
       throw new NotFoundException(`Subscription with ID ${subscriptionId} not found`);
     }
+    await this.assertSubscriptionAccess(sub, actor);
 
     const modDate = query.effectiveDate ? new Date(query.effectiveDate) : new Date();
     const currentStart = sub.currentPeriodStart ? new Date(sub.currentPeriodStart) : new Date();
@@ -506,7 +526,7 @@ export class BillingService {
       return this.previewProration(subscriptionId, {
         targetQuantity: dto.newQuantity,
         effectiveDate: dto.effectiveDate,
-      });
+      }, actor);
     }
 
     const modDate = dto.effectiveDate ? new Date(dto.effectiveDate) : new Date();
@@ -521,6 +541,7 @@ export class BillingService {
       if (!sub) {
         throw new NotFoundException(`Subscription with ID ${subscriptionId} not found`);
       }
+      await this.assertSubscriptionAccess(sub, actor, tx);
 
       if (sub.status !== 'active') {
         throw new BadRequestException(`Cannot modify subscription in '${sub.status}' state`);

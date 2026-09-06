@@ -130,7 +130,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       async (job: Job<EmailNotificationJobPayload>) => {
         return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
           this.logger.log(`Sending email [${job.data.templateId}] to ${job.data.to} (key: ${job.data.idempotencyKey})`);
-          return { delivered: true, recipient: job.data.to, template: job.data.templateId };
+          throw new Error('Email provider is not configured; notification was not sent');
         });
       },
       {
@@ -169,7 +169,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       async (job: Job<InvoiceGenerationJobPayload>) => {
         return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
           this.logger.log(`Processing invoice-generation PDF job for invoice ${job.data.invoiceId}`);
-          return { generated: true, invoiceId: job.data.invoiceId };
+          throw new Error('Invoice generation worker is not implemented');
         });
       },
       { connection, concurrency: 5 },
@@ -180,7 +180,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       async (job: Job<BillingScheduleJobPayload>) => {
         return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
           this.logger.log(`Processing billing schedule sweep for subscription ${job.data.subscriptionId}`);
-          return { processed: true, subscriptionId: job.data.subscriptionId };
+          throw new Error('Billing schedule worker is not implemented');
         });
       },
       { connection, concurrency: 5 },
@@ -191,7 +191,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       async (job: Job<ProrationCalculationJobPayload>) => {
         return runWithContext({ correlationId: job.data.correlationId || 'bullmq-worker', tenantId: job.data.tenantId }, async () => {
           this.logger.log(`Processing async proration for subscription ${job.data.subscriptionId}`);
-          return { processed: true, subscriptionId: job.data.subscriptionId };
+          throw new Error('Async proration worker is not implemented');
         });
       },
       { connection, concurrency: 5 },
