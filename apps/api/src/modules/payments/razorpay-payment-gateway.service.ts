@@ -18,8 +18,8 @@ export class RazorpayPaymentGatewayService implements IPaymentGatewayProvider {
     const keyId = config.get<string>('RAZORPAY_KEY_ID');
     const keySecret = config.get<string>('RAZORPAY_KEY_SECRET');
     this.webhookSecret = config.get<string>('RAZORPAY_WEBHOOK_SECRET') || '';
-    if (!keyId || !keySecret || !this.webhookSecret) {
-      throw new Error('Razorpay requires RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and RAZORPAY_WEBHOOK_SECRET');
+    if (!keyId || !keySecret) {
+      throw new Error('Razorpay requires RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET');
     }
     this.client = new Razorpay({ key_id: keyId, key_secret: keySecret });
   }
