@@ -59,6 +59,35 @@ export default function CustomerPortalDashboardPage() {
     );
   };
 
+  if (user && user.role !== 'customer') {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col">
+        <header className="h-14 border-b border-[#222] bg-[#0c0c0c] px-6 flex items-center justify-between sticky top-0 z-50">
+          <Link href="/portal" className="text-sm font-semibold tracking-tight text-white">
+            DealFlow360 <span className="text-xs text-gray-400 font-normal">| Customer Portal</span>
+          </Link>
+          <button onClick={logout} className="text-xs text-gray-400 hover:text-white border border-[#333] px-2.5 py-1 rounded bg-[#111]">
+            Sign Out
+          </button>
+        </header>
+        <main className="max-w-4xl mx-auto p-8 space-y-6 flex-1 flex flex-col items-center justify-center text-center">
+          <div className="p-8 border border-rose-900 bg-rose-950/30 rounded-xl space-y-4 max-w-lg">
+            <h2 className="text-lg font-bold text-rose-400">Access Restricted (Customer Role Required)</h2>
+            <p className="text-xs text-gray-300">
+              You are currently logged in as <strong className="text-white">{user.name}</strong> ({user.role}).
+              The Customer Portal is strictly reserved for external buyer accounts to view, negotiate, and confirm commercial proposals.
+            </p>
+            <div className="pt-4 flex items-center justify-center gap-3">
+              <Link href="/quotations" className="px-4 py-2 bg-white text-black text-xs font-semibold rounded hover:bg-gray-200 transition">
+                Go to Internal Workspace →
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       {/* Customer Portal Top Nav */}
