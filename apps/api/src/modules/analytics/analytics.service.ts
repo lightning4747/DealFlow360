@@ -43,12 +43,14 @@ export class AnalyticsService {
     const activeQuotesCount = Number(rows[0]?.count || 0);
 
     let score = 100;
-    score -= stalledDeals.length * 5;
-    for (const anomaly of discountAnomalies) {
-      if (anomaly.severity === 'CRITICAL') score -= 10;
-      else if (anomaly.severity === 'WARNING') score -= 4;
+    if (activeQuotesCount > 0) {
+      const stalledRatio = stalledDeals.length / activeQuotesCount;
+      score -= Math.round(stalledRatio * 40); // Max 40 pt deduction for stalled ratio
     }
-    const overallScore = Math.max(0, Math.min(100, score));
+    const criticalCount = discountAnomalies.filter((a) => a.severity === 'CRITICAL').length;
+    const warningCount = discountAnomalies.filter((a) => a.severity === 'WARNING').length;
+    score -= Math.min(30, criticalCount * 3 + warningCount * 1.5); // Max 30 pt deduction for anomalies
+    const overallScore = Math.max(30, Math.min(100, Math.round(score)));
 
     return {
       tenantId,
