@@ -163,6 +163,7 @@ export class StockReservationService {
           ORDER BY w.name, p.name`
     );
 
-    return result.rows;
+    const rows = (result as any)?.rows || (Array.isArray(result) ? result : []);
+    return rows;
   }
 }

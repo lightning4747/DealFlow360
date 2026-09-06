@@ -6,6 +6,7 @@ import {
   Param,
   Query,
   UseGuards,
+  Inject,
 } from '@nestjs/common';
 import { FulfillmentService } from './fulfillment.service';
 import { StockReservationService } from './stock-reservation.service';
@@ -24,10 +25,10 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FulfillmentController {
   constructor(
-    private readonly fulfillmentService: FulfillmentService,
-    private readonly stockReservationService: StockReservationService,
-    private readonly spatialEngine: SpatialAllocationEngine,
-    private readonly queueService: QueueService,
+    @Inject(FulfillmentService) private readonly fulfillmentService: FulfillmentService,
+    @Inject(StockReservationService) private readonly stockReservationService: StockReservationService,
+    @Inject(SpatialAllocationEngine) private readonly spatialEngine: SpatialAllocationEngine,
+    @Inject(QueueService) private readonly queueService: QueueService,
   ) {}
 
   @Get('warehouses')
