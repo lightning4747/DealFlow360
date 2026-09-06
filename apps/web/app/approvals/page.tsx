@@ -34,11 +34,14 @@ export default function ApprovalsPage() {
         if (authLoading || !accessToken) return;
         const res = await fetch(`${API_BASE_URL}/sales/approvals`, {
           headers: getAuthHeaders(),
+          cache: 'no-store',
         });
         if (!res.ok) throw new Error(`Failed to load approvals (HTTP ${res.status})`);
         const json = await res.json();
         setApprovals(
-          (json.data || []).map((item: any) => ({
+          (json.data || [])
+            .filter((item: any) => item.status === 'pending')
+            .map((item: any) => ({
                 id: item.id,
                 quoteId: item.quoteId || item.id,
                 customer: item.customerName || 'Enterprise Customer',
@@ -48,7 +51,7 @@ export default function ApprovalsPage() {
                 status: item.status || 'pending',
                 totalAmount: `$${item.totalAmount || '0'}`,
                 requestedDiscount: `${item.maxDiscountPct || 0}%`,
-          }))
+            }))
         );
       } catch (e: any) {
         setApprovals([]);

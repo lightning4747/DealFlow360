@@ -22,8 +22,13 @@ export default function DashboardPage() {
       if (!quoteRes.ok) throw new Error(`Dashboard data unavailable (HTTP ${quoteRes.status})`);
       setQuoteCount((await quoteRes.json()).meta?.total ?? 0);
       if (user?.role === 'admin' || user?.role === 'sales_manager' || user?.role === 'finance') {
-        const approvalRes = await fetch(`${API_BASE_URL}/sales/approvals`, { headers });
-        if (approvalRes.ok) setApprovalCount(((await approvalRes.json()).data || []).length);
+        const approvalRes = await fetch(`${API_BASE_URL}/sales/approvals`, {
+          headers,
+          cache: 'no-store',
+        });
+        if (!approvalRes.ok) throw new Error(`Dashboard data unavailable (HTTP ${approvalRes.status})`);
+        const approvals = (await approvalRes.json()).data || [];
+        setApprovalCount(approvals.filter((approval: { status?: string }) => approval.status === 'pending').length);
       }
       const healthRes = await fetch(`${API_BASE_URL}/analytics/deal-health`, { headers });
       if (!healthRes.ok) throw new Error(`Dashboard data unavailable (HTTP ${healthRes.status})`);
