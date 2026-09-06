@@ -382,14 +382,48 @@ export default function InvoicesPage() {
                   </button>
                   {pdfError && <span className="self-center text-xs text-rose-400">{pdfError}</span>}
                 </div>
-                {selectedInvoice.status !== 'paid' && selectedInvoice.status !== 'voided' && (
-                  <button
-                    onClick={() => setVoidDialogOpen(true)}
-                    className="px-3 py-1.5 rounded text-xs bg-rose-950 text-rose-300 border border-rose-800 hover:bg-rose-900 transition font-medium"
-                  >
-                    Void Invoice
-                  </button>
-                )}
+                <div className="flex items-center space-x-2">
+                  {selectedInvoice.status !== 'paid' && selectedInvoice.status !== 'voided' && (
+                    <>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const headers = getAuthHeaders();
+                            // Call process payment with test token
+                            const res = await fetch(`${API_BASE_URL}/payments/process`, {
+                              method: 'POST',
+                              headers: { ...headers, 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                invoiceId: selectedInvoice.id,
+                                token: 'tok_success',
+                                paymentMethod: 'CREDIT_CARD',
+                              }),
+                            });
+                            if (res.ok) {
+                              alert('Payment settled successfully! Invoice marked as PAID.');
+                              await openInvoiceDetail(selectedInvoice.id);
+                              await fetchInvoices();
+                            } else {
+                              const errJson = await res.json().catch(() => null);
+                              alert(errJson?.message || 'Payment processing failed');
+                            }
+                          } catch (err: any) {
+                            alert(err.message || 'Payment error');
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded text-xs bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition"
+                      >
+                        ⚡ Settle Test Payment
+                      </button>
+                      <button
+                        onClick={() => setVoidDialogOpen(true)}
+                        className="px-3 py-1.5 rounded text-xs bg-rose-950 text-rose-300 border border-rose-800 hover:bg-rose-900 transition font-medium"
+                      >
+                        Void Invoice
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>

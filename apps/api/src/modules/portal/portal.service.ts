@@ -10,9 +10,10 @@ import {
   customers,
 } from '@dealflow360/database';
 import { eq, and, gt } from 'drizzle-orm';
-import { CustomerCounterProposalDto } from '@dealflow360/types';
+import { CustomerCounterProposalDto, CalculateQuoteDto } from '@dealflow360/types';
 import { ApprovalRoutingService } from '../governance/approval-routing.service';
 import { OrderBifurcationService } from '../billing/order-bifurcation.service';
+import { QuoteCalculationService } from '../quotes/quote-calculation.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -21,6 +22,7 @@ export class PortalService {
     @Inject(DRIZZLE_DB) private readonly db: any,
     @Inject(ApprovalRoutingService) private readonly approvalRoutingService: ApprovalRoutingService,
     @Inject(OrderBifurcationService) private readonly orderBifurcationService: OrderBifurcationService,
+    @Inject(QuoteCalculationService) private readonly calcService: QuoteCalculationService,
   ) {}
 
   private async resolveParticipantName(email: string, requestedName?: string) {
@@ -111,7 +113,7 @@ export class PortalService {
     if (!quote) {
       throw new NotFoundException('Quote not found');
     }
-    const [customer] = await this.db.select({ email: customers.email }).from(customers).where(eq(customers.id, quote.customerId));
+    const [customer] = await this.db.select().from(customers).where(eq(customers.id, quote.customerId));
     if (!customer || customer.email.toLowerCase() !== session.email.toLowerCase()) {
       throw new BadRequestException('Portal session is not authorized for this quote');
     }
@@ -120,48 +122,74 @@ export class PortalService {
     }
 
     const counterDiscount = dto.counterDiscountPct;
+
+    const existingLines = await this.db
+      .select({
+        productId: quoteLines.productId,
+        variantId: quoteLines.variantId,
+        quantity: quoteLines.quantity,
+        unitPrice: quoteLines.unitPrice,
+        unitCost: quoteLines.unitCost,
+        discountPct: quoteLines.discountPct,
+        lineType: quoteLines.lineType,
+      })
+      .from(quoteLines)
+      .where(eq(quoteLines.quoteId, quote.id));
+
+    if (existingLines.length === 0) {
+      throw new BadRequestException('Cannot negotiate a quote with no line items');
+    }
+
+    const calcDto: CalculateQuoteDto = {
+      customerId: customer.id,
+      customerTier: (customer.tier as any) || 'bronze',
+      overrideDiscountPct: counterDiscount,
+      lines: existingLines.map((l: any) => ({
+        productId: l.productId,
+        variantId: l.variantId,
+        quantity: l.quantity,
+        unitPrice: Number(l.unitPrice),
+        unitCost: Number(l.unitCost || 0),
+        discountPct: Number(l.discountPct),
+        lineType: l.lineType || 'one_time',
+      })),
+    };
+
+    const calcSummary = this.calcService.calculate(calcDto);
+
     const updatedQuote = await this.db.transaction(async (tx: any) => {
-      const lines = await tx
+      const dbLines = await tx
         .select()
         .from(quoteLines)
         .where(eq(quoteLines.quoteId, quote.id));
-      if (lines.length === 0) {
-        throw new BadRequestException('Cannot negotiate a quote with no line items');
-      }
 
-      let totalAmount = 0;
-      let costTotal = 0;
-      for (const line of lines) {
-        const unitPrice = Number(line.unitPrice);
-        const unitCost = Number(line.unitCost || 0);
-        const lineTotal = Number((line.quantity * unitPrice * (1 - counterDiscount / 100)).toFixed(2));
-        const grossMargin = Number((lineTotal - line.quantity * unitCost).toFixed(2));
-        totalAmount += lineTotal;
-        costTotal += line.quantity * unitCost;
-        await tx
-          .update(quoteLines)
-          .set({
-            discountPct: counterDiscount.toFixed(2),
-            lineTotal: lineTotal.toFixed(2),
-            grossMargin: grossMargin.toFixed(2),
-          })
-          .where(eq(quoteLines.id, line.id));
+      for (let i = 0; i < dbLines.length; i++) {
+        const line = dbLines[i];
+        const calcLine = calcSummary.lines[i];
+        if (calcLine) {
+          await tx
+            .update(quoteLines)
+            .set({
+              discountPct: calcLine.discountPct.toFixed(2),
+              appliedCeilingPct: calcLine.appliedCeilingPct.toFixed(2),
+              violationScore: calcLine.violationScore.toFixed(4),
+              lineTotal: calcLine.lineTotal.toFixed(2),
+              grossMargin: calcLine.lineMarginAmount.toFixed(2),
+            })
+            .where(eq(quoteLines.id, line.id));
+        }
       }
-
-      totalAmount = Number(totalAmount.toFixed(2));
-      costTotal = Number(costTotal.toFixed(2));
-      const grossMarginPct = totalAmount > 0
-        ? Number((((totalAmount - costTotal) / totalAmount) * 100).toFixed(2))
-        : 0;
 
       const [result] = await tx
         .update(quotes)
         .set({
           status: 'under_negotiation',
           counterDiscountPct: counterDiscount.toFixed(2),
-          totalAmount: totalAmount.toFixed(2),
-          costTotal: costTotal.toFixed(2),
-          grossMarginPct: grossMarginPct.toFixed(2),
+          totalAmount: calcSummary.totalAmount.toFixed(2),
+          costTotal: calcSummary.totalCost.toFixed(2),
+          grossMarginPct: calcSummary.grossMarginPct.toFixed(2),
+          brsScore: calcSummary.brsScore.toFixed(2),
+          blendedRiskScore: calcSummary.brsScore.toFixed(2),
           updatedAt: new Date(),
         })
         .where(eq(quotes.id, quote.id))
@@ -180,9 +208,8 @@ export class PortalService {
       status: 'active',
     });
 
-    // Check if revised discount triggers governance approval
-    if (counterDiscount > 15) {
-      // Auto-trigger approval escalation
+    // Check if revised BRS or counter discount triggers governance approval
+    if (calcSummary.requiresApproval) {
       await this.approvalRoutingService.submitQuote(quote.id, {
         id: 'external-customer',
         role: 'customer',
