@@ -1,8 +1,0 @@
-packages:
-  - 'apps/*'
-  - 'packages/*'
-allowBuilds:
-  '@nestjs/core': true
-  es5-ext: true
-  esbuild: true
-  msgpackr-extract: set this to true or false
